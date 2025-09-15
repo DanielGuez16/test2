@@ -1,0 +1,331 @@
+[
+  {
+    "timestamp": "2025-09-15T13:32:26.983161",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:32:26.985765",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:32:27.496931",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:32:27.500743",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:33:44.002124",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:33:44.005752",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:33:44.514713",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:33:44.526165",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T13:34:36.334115",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:00:40.521001",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:00:40.526380",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:00:41.033305",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:00:41.044953",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:13:38.323044",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:13:38.836966",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:17:53.347838",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:17:53.353625",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:17:53.861977",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:17:53.873554",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:25:01.011804",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:25:01.524543",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:29:37.056040",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:29:37.568449",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:34:44.760820",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:34:45.272112",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:38:00.842644",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:38:01.355322",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:40:02.626670",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:40:02.630971",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:40:03.141342",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:40:03.153050",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:42:11.193954",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:06.134969",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:12.517586",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:14.993941",
+    "username": "admin.te@company.com",
+    "action": "LOGOUT",
+    "details": "User logged out from T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:22.000783",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:22.513933",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:39.351290",
+    "username": "admin.te@company.com",
+    "action": "LOGOUT",
+    "details": "User logged out from T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:51.294875",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:44:51.806678",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:55:26.888802",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:55:27.403932",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-15T23:55:35.888695",
+    "username": "admin.te@company.com",
+    "action": "LOGOUT",
+    "details": "User logged out from T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-16T00:00:43.784760",
+    "username": "admin.te@company.com",
+    "action": "LOGIN",
+    "details": "Successful login to T&E Chatbot",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-16T00:00:44.297551",
+    "username": "admin.te@company.com",
+    "action": "ACCESS",
+    "details": "Accessed T&E Chatbot main page",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-16T00:01:00.423743",
+    "username": "admin.te@company.com",
+    "action": "CHAT_MESSAGE",
+    "details": "Chat message: test...",
+    "system": "te_chatbot"
+  },
+  {
+    "timestamp": "2025-09-16T00:01:42.673315",
+    "username": "admin.te@company.com",
+    "action": "LOGOUT",
+    "details": "User logged out from T&E Chatbot",
+    "system": "te_chatbot"
+  }
+]
