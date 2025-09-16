@@ -16,49 +16,32 @@ from pathlib import Path
 
 # Base de données utilisateurs simple (en production: vraie BDD)
 USERS_DB = {
-    "admin.te@company.com": {
-        "username": "admin.te@company.com",
+    "daniel.guez@natixis.com": {
+        "username": "daniel.guez@natixis.com",
         "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
-        "full_name": "TE Admin APAC",
+        "full_name": "Daniel GUEZ",
         "role": "admin",
-        "region": "APAC",
-        "department": "Finance",
         "created_at": "2024-01-01T00:00:00"
     },
-    "analyst.te@company.com": {
-        "username": "analyst.te@company.com",
-        "password_hash": hashlib.sha256("analyst123".encode()).hexdigest(),
-        "full_name": "TE Analyst",
-        "role": "user",
-        "region": "APAC",
-        "department": "Finance",
+    "franck.pokou-ext@natixis.com": {
+        "username": "franck.pokou-ext@natixis.com",
+        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "full_name": "Franck POKOU",
+        "role": "admin", 
         "created_at": "2024-01-01T00:00:00"
     },
-    "manager.apac@company.com": {
-        "username": "manager.apac@company.com",
-        "password_hash": hashlib.sha256("manager123".encode()).hexdigest(),
-        "full_name": "APAC Finance Manager",
-        "role": "user",
-        "region": "APAC",
-        "department": "Finance",
+    "juvenalamos.ido@natixis.com": {
+        "username": "juvenalamos.ido@natixis.com",
+        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "full_name": "Juvenal Amos IDO",
+        "role": "admin", 
         "created_at": "2024-01-01T00:00:00"
     },
-    "user.singapore@company.com": {
-        "username": "user.singapore@company.com",
+    "user.te@natixis.com": {
+        "username": "user.te@natixis.com",
         "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
-        "full_name": "Singapore User",
+        "full_name": "User ALM",
         "role": "user",
-        "region": "APAC",
-        "department": "Sales",
-        "created_at": "2024-01-01T00:00:00"
-    },
-    "user.hongkong@company.com": {
-        "username": "user.hongkong@company.com",
-        "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
-        "full_name": "Hong Kong User",
-        "role": "user",
-        "region": "APAC",
-        "department": "Marketing",
         "created_at": "2024-01-01T00:00:00"
     }
 }

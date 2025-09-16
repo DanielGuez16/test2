@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# main.py - Chatbot T&E pour région APAC
+# run.py - Chatbot T&E pour région APAC
 """
 T&E Chatbot System - APAC Region
 =================================
@@ -32,6 +32,16 @@ import re
 from decimal import Decimal
 import PyPDF2
 from docx import Document
+import docx2txt
+from striprtf.striprtf import rtf_to_text
+import xlrd
+from context_builder import TEContextBuilder
+from ticket_analyzer import TicketAnalyzer
+# Import du système RAG
+from rag_system import TERAGSystem
+
+# Initialiser le système RAG
+rag_system = TERAGSystem()
 
 # Imports internes
 from llm_connector import LLMConnector
@@ -194,7 +204,6 @@ async def load_te_documents(
     word_file: UploadFile = File(...),
     session_token: Optional[str] = Cookie(None)
 ):
-    """Charge les documents T&E (Excel + Word) en mémoire"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -202,11 +211,11 @@ async def load_te_documents(
     try:
         log_activity(current_user["username"], "DOCUMENT_LOAD", f"Loading T&E documents: {excel_file.filename}, {word_file.filename}")
         
-        # Lire les fichiers en mémoire
+        # Lire les fichiers
         excel_content = await excel_file.read()
         word_content = await word_file.read()
         
-        # Traiter les documents avec le processeur T&E
+        # Traiter les documents
         excel_rules = te_processor.process_excel_rules(excel_content, excel_file.filename)
         word_policies = te_processor.process_word_policies(word_content, word_file.filename)
         
@@ -215,28 +224,39 @@ async def load_te_documents(
         te_documents["word_policies"] = word_policies
         te_documents["last_loaded"] = datetime.now().isoformat()
         
+        # NOUVEAU: Indexer dans le système RAG
+        logger.info("Indexation des documents dans le système RAG...")
+        rag_system.index_excel_rules(excel_rules)
+        rag_system.index_word_policies(word_policies)
+        
+        # Obtenir les stats RAG
+        rag_stats = rag_system.get_stats()
+        logger.info(f"RAG indexé: {rag_stats}")
+        
         total_rules = sum(len(rules) for rules in excel_rules.values())
-        logger.info(f"Documents T&E chargés: {total_rules} règles Excel, Policies Word: {len(word_policies)} chars")
         
         return {
             "success": True,
-            "message": "T&E documents loaded successfully",
+            "message": "T&E documents loaded and indexed successfully",
             "excel_rules_count": len(excel_rules),
+            "total_rules": total_rules,
             "word_policies_length": len(word_policies),
+            "rag_stats": rag_stats,
             "loaded_at": te_documents["last_loaded"]
         }
         
     except Exception as e:
         logger.error(f"Erreur chargement documents T&E: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading T&E documents: {str(e)}")
-
+    
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
     ticket_file: UploadFile = File(...),
     question: str = Form(""),
     session_token: Optional[str] = Cookie(None)
 ):
-    """Analyse un ticket contre les règles T&E"""
+    analyzer = TicketAnalyzer(rag_system, llm_connector)
+
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -247,21 +267,13 @@ async def analyze_ticket(
     try:
         log_activity(current_user["username"], "TICKET_ANALYSIS", f"Analyzing ticket: {ticket_file.filename}")
         
-        # Lire le ticket
+        # Lire le ticket (garder ta logique existante)
         ticket_content = await ticket_file.read()
-        
-        # Extraire les informations du ticket (OCR si nécessaire)
         ticket_info = extract_ticket_information(ticket_content, ticket_file.filename)
         
-        # Analyser contre les règles T&E
-        analysis_result = analyze_against_te_rules(ticket_info, te_documents["excel_rules"])
+        analyzer = TicketAnalyzer(rag_system, llm_connector)
         
-        # Préparer le contexte pour l'IA
-        context = prepare_te_context(ticket_info, analysis_result, te_documents)
-        
-        # Obtenir la réponse IA
-        user_prompt = f"Question: {question}\n\nTicket Information: {json.dumps(ticket_info, indent=2)}"
-        ai_response = llm_connector.get_llm_response(user_prompt, context)
+        analysis_result = analyzer.analyze_ticket(ticket_info, question)
         
         # Sauvegarder l'analyse
         analysis_record = {
@@ -270,8 +282,7 @@ async def analyze_ticket(
             "ticket_filename": ticket_file.filename,
             "ticket_info": ticket_info,
             "analysis_result": analysis_result,
-            "question": question,
-            "ai_response": ai_response
+            "question": question
         }
         
         chatbot_session["analysis_history"].append(analysis_record)
@@ -280,17 +291,17 @@ async def analyze_ticket(
             "success": True,
             "ticket_info": ticket_info,
             "analysis_result": analysis_result,
-            "ai_response": ai_response,
             "timestamp": analysis_record["timestamp"]
         }
         
     except Exception as e:
         logger.error(f"Erreur analyse ticket: {e}")
         raise HTTPException(status_code=500, detail=f"Error analyzing ticket: {str(e)}")
-
+    
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
-    """Endpoint pour le chatbot IA sans ticket"""
+    analyzer = TicketAnalyzer(rag_system, llm_connector)
+
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -299,19 +310,18 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         data = await request.json()
         user_message = data.get("message", "")
         
-        logger.info(f"Chat message reçu de {current_user['username']}: {user_message[:100]}")
-        
-        if not user_message.strip():
-            raise HTTPException(status_code=400, detail="Message vide")
-        
         log_activity(current_user["username"], "CHAT_MESSAGE", f"Chat message: {user_message[:100]}...")
         
-        # Préparer le contexte T&E
-        context = prepare_general_te_context()
+        analyzer = TicketAnalyzer(rag_system, llm_connector)
         
-        # Obtenir la réponse de l'IA
-        ai_response = llm_connector.get_llm_response(user_message, context)
-        logger.info(f"Réponse IA générée: {len(ai_response)} caractères")
+        # Préparer résumé des règles
+        te_rules_summary = {}
+        if te_documents["excel_rules"]:
+            for sheet_name, rules in te_documents["excel_rules"].items():
+                te_rules_summary[sheet_name] = len(rules)
+        
+        response_data = analyzer.answer_general_question(user_message, te_rules_summary)
+        ai_response = response_data['ai_response']
         
         # Sauvegarder la conversation
         chatbot_session["messages"].append({
@@ -336,7 +346,7 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
     except Exception as e:
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
-    
+      
 @app.post("/api/feedback")
 async def submit_feedback(
     request: Request,
@@ -409,40 +419,246 @@ async def get_te_status():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.post("/api/analyze-multiple-tickets")
+async def analyze_multiple_tickets(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    form = await request.form()
+    files = form.getlist("files")
+    question = form.get("question", "")
+    
+    results = []
+    
+    for file in files:
+        if hasattr(file, 'read'):  # Vérifier que c'est un fichier
+            try:
+                file_content = await file.read()
+                ticket_info = extract_ticket_information(file_content, file.filename)
+                analysis_result = analyze_against_te_rules(ticket_info, te_documents["excel_rules"])
+                
+                results.append({
+                    "filename": file.filename,
+                    "ticket_info": ticket_info,
+                    "analysis_result": analysis_result
+                })
+                
+            except Exception as e:
+                results.append({
+                    "filename": file.filename,
+                    "error": str(e)
+                })
+    
+    return {
+        "success": True,
+        "results": results,
+        "total_files": len(files)
+    }
+
 #######################################################################################################################################
 #                           UTILITY FUNCTIONS
 #######################################################################################################################################
 
+def preprocess_image_for_ocr(image):
+    """Préprocessing d'image pour améliorer l'OCR"""
+    try:
+        import cv2
+        import numpy as np
+        from PIL import Image, ImageEnhance, ImageFilter
+        
+        # Convertir en niveaux de gris
+        if image.mode != 'L':
+            image = image.convert('L')
+        
+        # Améliorer le contraste
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.0)
+        
+        # Améliorer la netteté
+        image = image.filter(ImageFilter.SHARPEN)
+        
+        # Redimensionner si trop petit
+        width, height = image.size
+        if width < 1000 or height < 1000:
+            scale_factor = max(1000/width, 1000/height)
+            new_size = (int(width * scale_factor), int(height * scale_factor))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+        
+        # Convertir en numpy pour OpenCV
+        img_array = np.array(image)
+        
+        # Seuillage adaptatif
+        img_thresh = cv2.adaptiveThreshold(
+            img_array, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+        
+        # Débruitage
+        img_denoised = cv2.medianBlur(img_thresh, 3)
+        
+        # Reconvertir en PIL
+        processed_image = Image.fromarray(img_denoised)
+        
+        return processed_image
+        
+    except ImportError:
+        logger.warning("OpenCV non disponible, preprocessing basique")
+        return image.convert('L')
+    except Exception as e:
+        logger.warning(f"Erreur preprocessing: {e}")
+        return image
+    
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
-    """Extrait les informations d'un ticket (OCR + parsing)"""
+    """Extrait les informations d'un ticket avec OCR amélioré et parsing intelligent"""
     try:
         file_ext = Path(filename).suffix.lower()
+        text = ""
         
-        if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']:
-            # Image - utiliser OCR
-            image = Image.open(io.BytesIO(file_content))
-            text = pytesseract.image_to_string(image)
+        if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp']:
+            # Images - utiliser OCR avec preprocessing
+            try:
+                import cv2
+                import numpy as np
+                from PIL import Image, ImageEnhance, ImageFilter
+                
+                # Convertir en PIL Image
+                image = Image.open(io.BytesIO(file_content))
+                
+                # Preprocessing pour améliorer l'OCR
+                image = preprocess_image_for_ocr(image)
+                
+                # OCR avec Tesseract
+                import pytesseract
+                
+                # Configuration OCR optimisée pour tickets
+                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-€$£¥₹/: '
+                text = pytesseract.image_to_string(image, config=custom_config)
+                
+                logger.info(f"OCR extrait {len(text)} caractères de {filename}")
+                
+            except Exception as e:
+                logger.warning(f"Erreur OCR image: {e}")
+                text = f"Image file {filename} - OCR extraction failed"
+                
         elif file_ext == '.pdf':
-            # PDF - extraire le texte
-            if PyPDF2:
-                try:
-                    pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-                    text = ""
-                    for page in pdf_reader.pages:
-                        text += page.extract_text()
-                except Exception as e:
-                    logger.warning(f"Erreur lecture PDF: {e}")
-                    text = f"PDF file {filename} - text extraction failed"
-            else:
-                text = f"PDF file {filename} - PyPDF2 not available"
-        else:
-            # Fichier texte
-            text = file_content.decode('utf-8', errors='ignore')
+            # PDF - extraire le texte avec multiple méthodes
+            try:
+                # Méthode 1: PyPDF2
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+                text_parts = []
+                for page in pdf_reader.pages:
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        text_parts.append(page_text)
+                
+                text = "\n".join(text_parts)
+                
+                # Si pas de texte extrait, essayer OCR sur PDF
+                if not text.strip():
+                    try:
+                        import fitz  # PyMuPDF
+                        pdf_doc = fitz.open(stream=file_content, filetype="pdf")
+                        
+                        for page_num in range(len(pdf_doc)):
+                            page = pdf_doc[page_num]
+                            # Convertir en image puis OCR
+                            mat = fitz.Matrix(2, 2)  # zoom factor
+                            pix = page.get_pixmap(matrix=mat)
+                            img_data = pix.tobytes("png")
+                            
+                            image = Image.open(io.BytesIO(img_data))
+                            image = preprocess_image_for_ocr(image)
+                            
+                            page_text = pytesseract.image_to_string(image)
+                            if page_text.strip():
+                                text_parts.append(page_text)
+                        
+                        text = "\n".join(text_parts)
+                        logger.info(f"PDF OCR extrait {len(text)} caractères")
+                        
+                    except ImportError:
+                        logger.warning("PyMuPDF non disponible pour OCR PDF")
+                    except Exception as e:
+                        logger.warning(f"Erreur OCR PDF: {e}")
+                
+            except Exception as e:
+                logger.warning(f"Erreur lecture PDF: {e}")
+                text = f"PDF file {filename} - text extraction failed"
         
-        # Parser les informations du ticket
-        ticket_info = parse_ticket_text(text)
+        elif file_ext in ['.docx', '.doc']:
+            # Documents Word
+            try:
+                if file_ext == '.docx':
+                    doc = Document(io.BytesIO(file_content))
+                    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+                else:
+                    # Pour .doc, utiliser python-docx2txt si disponible
+                    try:
+                        import docx2txt
+                        text = docx2txt.process(io.BytesIO(file_content))
+                    except ImportError:
+                        text = f"DOC file {filename} - docx2txt not available, please convert to DOCX"
+            except Exception as e:
+                logger.warning(f"Erreur lecture Word: {e}")
+                text = f"Word file {filename} - text extraction failed"
+                
+        elif file_ext in ['.xlsx', '.xls']:
+            # Fichiers Excel
+            try:
+                import pandas as pd
+                if file_ext == '.xlsx':
+                    df = pd.read_excel(io.BytesIO(file_content), sheet_name=None)
+                else:
+                    df = pd.read_excel(io.BytesIO(file_content), sheet_name=None, engine='xlrd')
+                
+                # Convertir toutes les sheets en texte
+                text_parts = []
+                for sheet_name, sheet_df in df.items():
+                    text_parts.append(f"Sheet: {sheet_name}")
+                    text_parts.append(sheet_df.to_string())
+                text = "\n".join(text_parts)
+            except Exception as e:
+                logger.warning(f"Erreur lecture Excel: {e}")
+                text = f"Excel file {filename} - text extraction failed"
+                
+        elif file_ext in ['.txt', '.csv']:
+            # Fichiers texte et CSV
+            try:
+                text = file_content.decode('utf-8', errors='ignore')
+            except Exception as e:
+                try:
+                    text = file_content.decode('latin-1', errors='ignore')
+                except:
+                    text = f"Text file {filename} - encoding detection failed"
+                    
+        elif file_ext in ['.rtf']:
+            # Rich Text Format
+            try:
+                from striprtf.striprtf import rtf_to_text
+                text = rtf_to_text(file_content.decode('utf-8', errors='ignore'))
+            except ImportError:
+                text = f"RTF file {filename} - striprtf not available"
+            except Exception as e:
+                logger.warning(f"Erreur lecture RTF: {e}")
+                text = f"RTF file {filename} - text extraction failed"
+                
+        else:
+            # Type non supporté - essayer comme texte brut
+            try:
+                text = file_content.decode('utf-8', errors='ignore')
+                if not text.strip():
+                    text = f"Unknown file type {filename} - content unreadable"
+            except:
+                text = f"Unsupported file type {filename} ({file_ext})"
+    
+        # Parser les informations du ticket avec extraction améliorée
+        ticket_info = parse_ticket_text_enhanced(text)
         ticket_info["filename"] = filename
-        ticket_info["raw_text"] = text
+        ticket_info["raw_text"] = text[:1500]  # Augmenté pour plus de contexte
+        ticket_info["file_type"] = file_ext
         
         return ticket_info
         
@@ -452,12 +668,121 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
             "filename": filename,
             "error": str(e),
             "raw_text": "",
+            "file_type": Path(filename).suffix.lower(),
             "amount": None,
             "currency": None,
             "date": None,
             "vendor": None,
-            "category": "unknown"
+            "category": "unknown",
+            "location": None,
+            "confidence": 0.0
         }
+    
+def parse_ticket_text_enhanced(text: str) -> dict:
+    """Parse amélioré du texte d'un ticket avec regex robustes"""
+    info = {
+        "amount": None,
+        "currency": None,
+        "date": None,
+        "vendor": None,
+        "category": "unknown",
+        "location": None,
+        "country_code": None,
+        "description": "",
+        "confidence": 0.0
+    }
+    
+    confidence_factors = []
+    
+    # === EXTRACTION DES MONTANTS AMÉLIORÉE ===
+    amount_patterns = [
+        # Patterns avec devise avant
+        r'(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD|CNY|INR|THB|MYR|KRW|TWD)\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)',
+        # Patterns avec devise après
+        r'([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD|CNY|INR|THB|MYR|KRW|TWD)',
+        # Patterns avec symboles
+        r'([€$£¥₹])\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)',
+        r'([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*([€$£¥₹])',
+        # Total/Amount labels
+        r'(?:Total|Amount|Price|Prix|Montant)[\s:]*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD)?',
+        # Patterns numériques seuls (moins fiables)
+        r'([0-9]{1,4}[.,][0-9]{2})\b'
+    ]
+    
+    amount_found = False
+    for i, pattern in enumerate(amount_patterns):
+        matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if matches:
+            for match in matches:
+                try:
+                    if len(match) == 2:
+                        # Déterminer quel élément est le montant
+                        if match[0].replace(',', '.').replace('.', '').isdigit():
+                            amount_str = match[0]
+                            currency_str = match[1]
+                        else:
+                            amount_str = match[1]
+                            currency_str = match[0]
+                        
+                        # Nettoyer et convertir le montant
+                        cleaned_amount = clean_amount_string(amount_str)
+                        if cleaned_amount and 0.01 <= cleaned_amount <= 100000:  # Plage raisonnable
+                            info["amount"] = cleaned_amount
+                            info["currency"] = (currency_str)
+                            confidence_factors.append(0.3 - (i * 0.05))  # Plus de confiance pour les premiers patterns
+                            amount_found = True
+                            break
+                    elif len(match) == 1:
+                        # Montant seul
+                        cleaned_amount = clean_amount_string(match)
+                        if cleaned_amount and 1 <= cleaned_amount <= 100000:
+                            info["amount"] = cleaned_amount
+                            confidence_factors.append(0.1)
+                            amount_found = True
+                            break
+                except (ValueError, IndexError):
+                    continue
+        if amount_found:
+            break
+    
+    # === EXTRACTION DES DATES AMÉLIORÉE ===
+    date_patterns = [
+        r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})',      # DD/MM/YYYY ou MM/DD/YYYY
+        r'(\d{4}[/.-]\d{1,2}[/.-]\d{1,2})',      # YYYY/MM/DD
+        r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})',  # DD Month YYYY
+        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})', # Month DD, YYYY
+        r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{2})'       # DD/MM/YY
+    ]
+    
+    for pattern in date_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            info["date"] = matches[0]
+            confidence_factors.append(0.2)
+            break
+    
+    # === DÉTECTION INTELLIGENTE DU PAYS/LIEU ===
+    location_info = detect_location_from_text(text)
+    info.update(location_info)
+    if location_info.get("country_code"):
+        confidence_factors.append(0.2)
+    
+    # === CATÉGORISATION AMÉLIORÉE ===
+    category_info = categorize_expense_enhanced(text)
+    info["category"] = category_info["category"]
+    confidence_factors.append(category_info["confidence"])
+    
+    # === EXTRACTION DU VENDEUR ===
+    vendor_info = extract_vendor_info(text)
+    info["vendor"] = vendor_info["name"]
+    confidence_factors.append(vendor_info["confidence"])
+    
+    # === CALCUL DE LA CONFIANCE GLOBALE ===
+    info["confidence"] = min(sum(confidence_factors), 1.0)
+    
+    info["description"] = text[:300]  # Description plus longue
+    
+    return info
 
 def parse_ticket_text(text: str) -> dict:
     """Parse le texte d'un ticket pour extraire les informations clés"""
@@ -730,6 +1055,218 @@ def save_feedback_to_csv(feedback_record: dict):
         
     except Exception as e:
         logger.error(f"Erreur sauvegarde feedback: {e}")
+
+def clean_amount_string(amount_str: str) -> float:
+    """Nettoie et convertit une chaîne de montant en float"""
+    try:
+        # Supprimer espaces et caractères non numériques sauf , et .
+        cleaned = re.sub(r'[^\d.,]', '', amount_str.strip())
+        
+        if not cleaned:
+            return None
+        
+        # Gérer les différents formats de séparateurs
+        if ',' in cleaned and '.' in cleaned:
+            # Format: 1,234.56 ou 1.234,56
+            comma_pos = cleaned.rfind(',')
+            dot_pos = cleaned.rfind('.')
+            
+            if dot_pos > comma_pos:
+                # Format anglais: 1,234.56
+                cleaned = cleaned.replace(',', '')
+            else:
+                # Format européen: 1.234,56
+                cleaned = cleaned.replace('.', '').replace(',', '.')
+        elif ',' in cleaned:
+            # Déterminer si c'est un séparateur de milliers ou décimal
+            comma_parts = cleaned.split(',')
+            if len(comma_parts) == 2 and len(comma_parts[1]) <= 2:
+                # Séparateur décimal
+                cleaned = cleaned.replace(',', '.')
+            else:
+                # Séparateur de milliers
+                cleaned = cleaned.replace(',', '')
+        
+        return float(cleaned)
+        
+    except (ValueError, AttributeError):
+        return None
+
+def normalize_currency(currency_str: str) -> str:
+    """Normalise les codes de devise"""
+    currency_map = {
+        '€': 'EUR', '$': 'USD', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
+        'euro': 'EUR', 'dollar': 'USD', 'pound': 'GBP', 'yen': 'JPY'
+    }
+    
+    currency_clean = currency_str.strip().upper()
+    return currency_map.get(currency_clean, currency_clean)
+
+def detect_location_from_text(text: str) -> dict:
+    """Détection intelligente du pays/lieu à partir du texte"""
+    location_info = {
+        "location": None,
+        "country_code": None,
+        "city": None
+    }
+    
+    # Base de données de correspondances géographiques
+    location_mappings = {
+        # Villes -> Pays
+        'paris': {'country': 'FR', 'city': 'Paris'},
+        'lyon': {'country': 'FR', 'city': 'Lyon'},
+        'marseille': {'country': 'FR', 'city': 'Marseille'},
+        'london': {'country': 'GB', 'city': 'London'},
+        'berlin': {'country': 'DE', 'city': 'Berlin'},
+        'munich': {'country': 'DE', 'city': 'Munich'},
+        'frankfurt': {'country': 'DE', 'city': 'Frankfurt'},
+        'sydney': {'country': 'AU', 'city': 'Sydney'},
+        'melbourne': {'country': 'AU', 'city': 'Melbourne'},
+        'tokyo': {'country': 'JP', 'city': 'Tokyo'},
+        'osaka': {'country': 'JP', 'city': 'Osaka'},
+        'singapore': {'country': 'SG', 'city': 'Singapore'},
+        'hongkong': {'country': 'HK', 'city': 'Hong Kong'},
+        'hong kong': {'country': 'HK', 'city': 'Hong Kong'},
+        'dubai': {'country': 'AE', 'city': 'Dubai'},
+        'abu dhabi': {'country': 'AE', 'city': 'Abu Dhabi'},
+        'zurich': {'country': 'CH', 'city': 'Zurich'},
+        'geneva': {'country': 'CH', 'city': 'Geneva'},
+        'new york': {'country': 'US', 'city': 'New York'},
+        'chicago': {'country': 'US', 'city': 'Chicago'},
+        'los angeles': {'country': 'US', 'city': 'Los Angeles'},
+        'bangkok': {'country': 'TH', 'city': 'Bangkok'},
+        'kuala lumpur': {'country': 'MY', 'city': 'Kuala Lumpur'},
+        'seoul': {'country': 'KR', 'city': 'Seoul'},
+        'taipei': {'country': 'TW', 'city': 'Taipei'},
+        'mumbai': {'country': 'IN', 'city': 'Mumbai'},
+        'delhi': {'country': 'IN', 'city': 'Delhi'},
+        'beijing': {'country': 'CN', 'city': 'Beijing'},
+        'shanghai': {'country': 'CN', 'city': 'Shanghai'}
+    }
+    
+    # Codes pays directs
+    country_codes = {
+        'france': 'FR', 'germany': 'DE', 'australia': 'AU', 'japan': 'JP',
+        'singapore': 'SG', 'uae': 'AE', 'switzerland': 'CH', 'usa': 'US',
+        'united states': 'US', 'united kingdom': 'GB', 'uk': 'GB',
+        'thailand': 'TH', 'malaysia': 'MY', 'south korea': 'KR', 'korea': 'KR',
+        'taiwan': 'TW', 'india': 'IN', 'china': 'CN'
+    }
+    
+    text_lower = text.lower()
+    
+    # Rechercher les villes
+    for city, info in location_mappings.items():
+        if city in text_lower:
+            location_info["city"] = info["city"]
+            location_info["country_code"] = info["country"]
+            location_info["location"] = info["city"]
+            return location_info
+    
+    # Rechercher les pays
+    for country, code in country_codes.items():
+        if country in text_lower:
+            location_info["country_code"] = code
+            location_info["location"] = country.title()
+            return location_info
+    
+    # Rechercher les codes de pays (FR, DE, etc.)
+    country_pattern = r'\b([A-Z]{2})\b'
+    matches = re.findall(country_pattern, text)
+    valid_codes = ['FR', 'DE', 'AU', 'JP', 'SG', 'AE', 'CH', 'US', 'GB', 'TH', 'MY', 'KR', 'TW', 'IN', 'CN']
+    for match in matches:
+        if match in valid_codes:
+            location_info["country_code"] = match
+            return location_info
+    
+    return location_info
+
+def categorize_expense_enhanced(text: str) -> dict:
+    """Catégorisation améliorée des dépenses"""
+    text_lower = text.lower()
+    
+    # Définitions de catégories avec scores de confiance
+    categories = {
+        "hotel": {
+            "keywords": ["hotel", "accommodation", "lodging", "room", "night", "stay", "resort", "inn", "motel"],
+            "patterns": [r"hotel\s+\w+", r"room\s+\d+", r"\d+\s+night"],
+            "confidence": 0.3
+        },
+        "meal": {
+            "keywords": ["restaurant", "meal", "food", "dining", "cafe", "bistro", "brasserie", "eatery"],
+            "patterns": [r"restaurant\s+\w+", r"table\s+\d+", r"menu"],
+            "confidence": 0.25
+        },
+        "breakfast": {
+            "keywords": ["breakfast", "petit dejeuner", "morning", "coffee", "croissant"],
+            "patterns": [r"breakfast\s+menu", r"petit\s+dejeuner"],
+            "confidence": 0.3
+        },
+        "transport": {
+            "keywords": ["taxi", "uber", "metro", "bus", "train", "transport", "ride", "fare"],
+            "patterns": [r"taxi\s+\w+", r"uber\s+trip", r"metro\s+ticket"],
+            "confidence": 0.3
+        },
+        "flight": {
+            "keywords": ["flight", "airline", "airport", "boarding", "gate", "seat"],
+            "patterns": [r"flight\s+\w+", r"gate\s+\w+", r"seat\s+\w+"],
+            "confidence": 0.35
+        }
+    }
+    
+    best_category = "unknown"
+    best_confidence = 0.0
+    
+    for category, data in categories.items():
+        confidence = 0.0
+        
+        # Vérifier les mots-clés
+        keyword_matches = sum(1 for keyword in data["keywords"] if keyword in text_lower)
+        if keyword_matches > 0:
+            confidence += data["confidence"] * (keyword_matches / len(data["keywords"]))
+        
+        # Vérifier les patterns
+        for pattern in data["patterns"]:
+            if re.search(pattern, text_lower):
+                confidence += 0.1
+        
+        if confidence > best_confidence:
+            best_confidence = confidence
+            best_category = category
+    
+    return {
+        "category": best_category,
+        "confidence": min(best_confidence, 0.3)  # Plafonner à 0.3
+    }
+
+def extract_vendor_info(text: str) -> dict:
+    """Extraction des informations du vendeur/établissement"""
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    
+    if not lines:
+        return {"name": None, "confidence": 0.0}
+    
+    # La première ligne non-vide est souvent le nom du vendeur
+    first_line = lines[0]
+    
+    # Nettoyer les artefacts OCR courants
+    cleaned_line = re.sub(r'^[^\w]+|[^\w]+$', '', first_line)
+    
+    # Vérifier si ça ressemble à un nom d'établissement
+    confidence = 0.1
+    if len(cleaned_line) > 3 and len(cleaned_line) < 50:
+        confidence = 0.2
+        
+        # Bonus si contient des mots d'établissement
+        establishment_words = ["hotel", "restaurant", "cafe", "bistro", "store", "shop", "market"]
+        if any(word in cleaned_line.lower() for word in establishment_words):
+            confidence = 0.25
+    
+    return {
+        "name": cleaned_line[:50] if cleaned_line else None,
+        "confidence": confidence
+    }
+
 
 #######################################################################################################################################
 #                           ADMIN ROUTES

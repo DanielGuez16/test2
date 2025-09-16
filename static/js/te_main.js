@@ -384,132 +384,56 @@ function handleTicketUpload(file) {
 }
 
 async function analyzeTicket() {
-    console.log('Début analyse ticket');
+    if (selectedFiles.length === 0) return;
     
-    if (!currentTicketFile) {
-        alert('Veuillez d\'abord charger un ticket.');
-        return;
-    }
+    const formData = new FormData();
+    selectedFiles.forEach(file => {
+        formData.append('files', file);
+    });
     
-    const questionInput = document.getElementById('question-input');
-    const question = questionInput ? questionInput.value.trim() : '';
-    const finalQuestion = question || 'Cette dépense est-elle valide selon la politique T&E ?';
-    
-    const analyzeBtn = document.getElementById('analyze-btn');
-    
-    // État de chargement
-    const originalText = analyzeBtn.innerHTML;
-    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyse...';
-    analyzeBtn.disabled = true;
+    const question = document.getElementById('question-input').value;
+    formData.append('question', question);
     
     try {
-        console.log('Envoi à l\'API...');
-        
-        // Ajouter un message dans le chat immédiatement
-        addMessageToChat('assistant', `Analyse en cours du fichier "${currentTicketFile.name}"...`);
-        
-        const formData = new FormData();
-        formData.append('ticket_file', currentTicketFile);
-        formData.append('question', finalQuestion);
-        
-        const response = await fetch('/api/analyze-ticket', {
+        const response = await fetch('/api/analyze-multiple-tickets', {
             method: 'POST',
             body: formData
         });
         
-        console.log('Réponse API reçue:', response.status);
-        
-        const result = await response.json();
-        console.log('Résultat:', result);
-        
-        if (result.success) {
-            // Afficher les résultats
-            displayAnalysisResult(result);
-            
-            // Ajouter au chat
-            const summary = `Analyse terminée pour ${currentTicketFile.name}:\n\n${result.ai_response}`;
-            addMessageToChat('assistant', summary);
-            
-            currentAnalysisId = result.timestamp;
-        } else {
-            throw new Error(result.detail || 'Échec de l\'analyse');
-        }
+        const data = await response.json();
+        displayAnalysisResults(data.results);
         
     } catch (error) {
         console.error('Erreur analyse:', error);
-        addMessageToChat('assistant', `Erreur lors de l'analyse: ${error.message}`);
-        alert('Erreur analyse: ' + error.message);
-    } finally {
-        // Restaurer le bouton
-        analyzeBtn.innerHTML = originalText;
-        analyzeBtn.disabled = false;
     }
 }
 
-function displayAnalysisResult(result) {
-    const ticketStatus = document.getElementById('ticket-status');
-    if (!ticketStatus) return;
+function displayAnalysisResults(results) {
+    const container = document.getElementById('ticket-status');
+    let html = '<div class="analysis-results">';
     
-    const statusClass = result.analysis_result.is_valid ? 'success' : 
-                       result.analysis_result.status === 'requires_approval' ? 'warning' : 'danger';
+    results.forEach((result, index) => {
+        if (result.error) {
+            html += `
+                <div class="alert alert-warning mb-2">
+                    <strong>${result.filename}:</strong> ${result.error}
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="analysis-result mb-3">
+                    <h6>${result.filename}</h6>
+                    <div class="result-content">
+                        <!-- Contenu de l'analyse -->
+                    </div>
+                </div>
+            `;
+        }
+    });
     
-    const statusIcon = result.analysis_result.is_valid ? 'check-circle' : 
-                      result.analysis_result.status === 'requires_approval' ? 'exclamation-triangle' : 'times-circle';
-    
-    ticketStatus.innerHTML = `
-        <div class="analysis-result ${result.analysis_result.is_valid ? 'valid' : 'invalid'}">
-            <h6 class="mb-3">
-                <i class="fas fa-${statusIcon} text-${statusClass} me-2"></i>
-                Analysis Result
-            </h6>
-            
-            <div class="mb-3">
-                <strong>Status:</strong>
-                <span class="status-indicator status-${statusClass === 'success' ? 'approved' : statusClass === 'warning' ? 'pending' : 'rejected'}">
-                    ${result.analysis_result.status.replace('_', ' ').toUpperCase()}
-                </span>
-            </div>
-            
-            ${result.ticket_info.amount ? `
-                <div class="mb-2">
-                    <strong>Amount:</strong> ${result.ticket_info.amount} ${result.ticket_info.currency || ''}
-                </div>
-            ` : ''}
-            
-            ${result.ticket_info.category ? `
-                <div class="mb-2">
-                    <strong>Category:</strong> ${result.ticket_info.category}
-                </div>
-            ` : ''}
-            
-            ${result.analysis_result.issues && result.analysis_result.issues.length > 0 ? `
-                <div class="mb-3">
-                    <strong class="text-danger">Issues:</strong>
-                    <ul class="mb-0">
-                        ${result.analysis_result.issues.map(issue => `<li>${issue}</li>`).join('')}
-                    </ul>
-                </div>
-            ` : ''}
-            
-            ${result.analysis_result.recommendations && result.analysis_result.recommendations.length > 0 ? `
-                <div class="mb-3">
-                    <strong class="text-info">Recommendations:</strong>
-                    <ul class="mb-0">
-                        ${result.analysis_result.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                    </ul>
-                </div>
-            ` : ''}
-            
-            <div class="text-end">
-                <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
-                    <i class="fas fa-comment me-1"></i>
-                    Give Feedback
-                </button>
-            </div>
-        </div>
-    `;
+    html += '</div>';
+    container.innerHTML = html;
 }
-
 // ===== GESTION DES DOCUMENTS T&E =====
 
 function showDocumentUpload() {
@@ -1115,6 +1039,85 @@ function formatDateTime(isoString) {
         return isoString.substring(0, 16);
     }
 }
+
+let selectedFiles = [];
+
+// Gestion drag & drop multiple
+function setupDragAndDrop() {
+    const uploadArea = document.getElementById('ticket-upload-area');
+    
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('drag-over');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        
+        const files = Array.from(e.dataTransfer.files);
+        handleMultipleTicketUpload(files);
+    });
+}
+
+function handleMultipleTicketUpload(files) {
+    const supportedExtensions = [
+        'pdf', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'webp',
+        'doc', 'docx', 'txt', 'csv', 'xlsx', 'xls', 'rtf'
+    ];
+    
+    const validFiles = Array.from(files).filter(file => {
+        const extension = file.name.split('.').pop().toLowerCase();
+        return supportedExtensions.includes(extension);
+    });
+    
+    if (validFiles.length !== files.length) {
+        const invalidCount = files.length - validFiles.length;
+        alert(`${invalidCount} fichier(s) ignoré(s) - types non supportés`);
+    }
+    
+    selectedFiles = validFiles;
+    displaySelectedFiles();
+    document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
+}
+
+function displaySelectedFiles() {
+    const container = document.getElementById('ticket-status');
+    
+    if (selectedFiles.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="uploaded-files-list">';
+    selectedFiles.forEach((file, index) => {
+        html += `
+            <div class="file-item">
+                <span>${file.name}</span>
+                <span class="file-remove" onclick="removeFile(${index})">×</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    displaySelectedFiles();
+    document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
+}
+
+// Initialiser au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    setupDragAndDrop();
+});
 
 // ===== FONCTIONS GLOBALES POUR LES ONCLICK =====
 

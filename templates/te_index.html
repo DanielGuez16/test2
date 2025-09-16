@@ -11,44 +11,68 @@
     
     <style>
         :root {
-            --primary-blue: #2c5aa0;
-            --secondary-blue: #4a90e2;
+            --natixis-blue: #76279b;
+            --natixis-light-blue: #ab54d4;
+            --natixis-very-light-blue: #D3A5E9;
+            --natixis-green: #00a651;
+            --natixis-orange: #ff6600;
+            --natixis-gray: #f5f5f5;
             --success-green: #28a745;
-            --warning-orange: #fd7e14;
             --danger-red: #dc3545;
+            --warning-orange: #fd7e14;
             --light-gray: #f8f9fa;
             --border-color: #e0e6ed;
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: #f2f0f0;
             min-height: 100vh;
-            font-family: 'Segoe UI', Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         .main-container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            margin: 20px auto;
-            max-width: 1400px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            margin: 30px auto;
+            max-width: 1200px;
+            backdrop-filter: blur(10px);
         }
 
         .navbar-custom {
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
-            border-radius: 20px 20px 0 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            margin: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             padding: 1rem 2rem;
         }
 
         .navbar-brand {
-            color: white !important;
+            color: var(--natixis-blue) !important;
             font-size: 1.5rem;
             font-weight: 600;
         }
 
+        .navbar-logo {
+            height: 40px;
+            margin-right: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .navbar-logo:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-outline-light {
+            border-color: var(--natixis-blue);
+            color: var(--natixis-blue);
+        }
+
         .btn-outline-light:hover {
-            background-color: rgba(255,255,255,0.2);
-            border-color: white;
+            background-color: var(--natixis-light-blue);
+            border-color: var(--natixis-light-blue);
+            color: white;
         }
 
         /* Section d'upload des documents */
@@ -60,7 +84,7 @@
         }
 
         .upload-area {
-            border: 3px dashed var(--secondary-blue);
+            border: 3px dashed var(--natixis-light-blue);
             border-radius: 15px;
             padding: 2rem;
             text-align: center;
@@ -70,37 +94,37 @@
         }
 
         .upload-area:hover {
-            border-color: var(--success-green);
-            background: rgba(40, 167, 69, 0.05);
+            border-color: var(--natixis-green);
+            background: rgba(0, 166, 81, 0.05);
             transform: translateY(-2px);
         }
 
         .upload-area.drag-over {
-            border-color: var(--success-green) !important;
-            background: rgba(40, 167, 69, 0.1) !important;
+            border-color: var(--natixis-green) !important;
+            background: rgba(0, 166, 81, 0.1) !important;
             transform: scale(1.02);
         }
 
         .upload-area i {
             font-size: 3rem;
-            color: var(--secondary-blue);
+            color: var(--natixis-light-blue);
             margin-bottom: 1rem;
         }
 
         .upload-area:hover i {
-            color: var(--success-green);
+            color: var(--natixis-green);
         }
 
         /* Section chatbot */
         .chatbot-section {
             background: white;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             margin: 2rem 0;
         }
 
         .chat-header {
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+            background: var(--natixis-blue);
             color: white;
             border-radius: 15px 15px 0 0;
             padding: 1.5rem;
@@ -124,7 +148,7 @@
         }
 
         .chat-message.user {
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+            background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue));
             color: white;
             margin-left: auto;
             text-align: right;
@@ -145,7 +169,7 @@
         }
 
         .chat-input {
-            border: 2px solid var(--border-color);
+            border: 2px solid var(--natixis-light-blue);
             border-radius: 25px;
             padding: 12px 20px;
             font-size: 14px;
@@ -153,12 +177,12 @@
         }
 
         .chat-input:focus {
-            border-color: var(--secondary-blue);
-            box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+            border-color: var(--natixis-blue);
+            box-shadow: 0 0 0 0.2rem rgba(154, 96, 177, 0.25);
         }
 
         .btn-chat {
-            background: var(--primary-blue);
+            background: var(--natixis-blue);
             border: none;
             border-radius: 50%;
             width: 50px;
@@ -170,13 +194,13 @@
         }
 
         .btn-chat:hover {
-            background: var(--secondary-blue);
+            background: var(--natixis-light-blue);
             transform: scale(1.05);
         }
 
         /* Upload de tickets */
         .ticket-upload-area {
-            border: 2px dashed var(--secondary-blue);
+            border: 2px dashed var(--natixis-light-blue);
             border-radius: 15px;
             padding: 1.5rem;
             text-align: center;
@@ -187,13 +211,13 @@
         }
 
         .ticket-upload-area:hover {
-            border-color: var(--success-green);
-            background: rgba(40, 167, 69, 0.05);
+            border-color: var(--natixis-green);
+            background: rgba(0, 166, 81, 0.05);
         }
 
         .ticket-upload-area.drag-over {
-            border-color: var(--success-green) !important;
-            background: rgba(40, 167, 69, 0.1) !important;
+            border-color: var(--natixis-green) !important;
+            background: rgba(0, 166, 81, 0.1) !important;
         }
 
         /* Résultats d'analyse */
@@ -281,7 +305,7 @@
             border-radius: 10px;
             padding: 1rem;
             margin-bottom: 0.5rem;
-            border-left: 4px solid var(--secondary-blue);
+            border-left: 4px solid var(--natixis-light-blue);
             transition: transform 0.2s ease;
         }
 
@@ -292,7 +316,7 @@
 
         /* Documents status */
         .documents-status {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            background: var(--natixis-very-light-blue);
             border-radius: 15px;
             padding: 1.5rem;
             margin-bottom: 2rem;
@@ -300,6 +324,69 @@
 
         .documents-status.loaded {
             background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+        }
+
+        .bg-primary {
+            background-color: var(--natixis-blue) !important;
+        }
+
+        .bg-secondary {
+            background-color: var(--natixis-light-blue) !important;
+        }
+
+        .bg-third {
+            background-color: var(--natixis-very-light-blue) !important;
+        }
+
+        .text-primary {
+            color: var(--natixis-blue) !important;
+        }
+
+        .text-black {
+            color: black !important; 
+        }
+        
+        /* Boutons avec style Natixis */
+        .btn-primary {
+            background: var(--natixis-blue);
+            border-color: var(--natixis-blue);
+        }
+
+        .btn-primary:hover {
+            background: var(--natixis-light-blue);
+            border-color: var(--natixis-light-blue);
+        }
+
+        .btn-success {
+            background: var(--natixis-green);
+            border-color: var(--natixis-green);
+        }
+
+        .btn-success:hover {
+            background: #00a651;
+            border-color: #00a651;
+        }
+
+        .btn-outline-primary {
+            border-color: var(--natixis-blue);
+            color: var(--natixis-blue);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--natixis-blue);
+            border-color: var(--natixis-blue);
+            color: white;
+        }
+
+        .btn-outline-danger {
+            border-color: var(--danger-red);
+            color: var(--danger-red);
+        }
+
+        .btn-outline-danger:hover {
+            background-color: var(--danger-red);
+            border-color: var(--danger-red);
+            color: white;
         }
 
         /* Responsive design */
@@ -337,9 +424,32 @@
             width: 40px;
             height: 40px;
             border: 4px solid var(--border-color);
-            border-top: 4px solid var(--primary-blue);
+            border-top: 4px solid var(--natixis-blue);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+        }
+
+        .uploaded-files-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .file-item {
+            background: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .file-remove {
+            color: #dc3545;
+            cursor: pointer;
+            margin-left: auto;
         }
 
         @keyframes spin {
@@ -350,31 +460,29 @@
 </head>
 <body>
     <!-- Navigation -->
-    <div class="main-container">
-        <nav class="navbar-custom">
-            <div class="d-flex justify-content-between align-items-center w-100">
-                <div class="d-flex align-items-center">
-                    <h1 class="navbar-brand mb-0">
-                        <i class="fas fa-receipt me-2"></i>
-                        T&E Analysis Chatbot
-                    </h1>
-                    <span class="badge bg-light text-dark ms-3">APAC Region</span>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="text-light me-3">{{ user.full_name }}</span>
-                    {% if user.role == 'admin' %}
-                        <button class="btn btn-outline-light btn-sm me-2" onclick="showAdminPanel()">
-                            <i class="fas fa-cogs"></i> Admin
-                        </button>
-                    {% endif %}
-                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </button>
-                </div>
+    <div class="navbar-custom">
+        <div class="container d-flex justify-content-between align-items-center py-3">
+            <div class="d-flex align-items-center">
+                <img src="/static/images/bpce_logo.png" alt="BPCE Logo" class="navbar-logo">
             </div>
-        </nav>
-
-        <div class="container-fluid p-4">
+            <div class="d-flex align-items-center">
+                <span class="badge bg-third me-3">{{ user.full_name }}</span>
+                {% if user.role == 'admin' %}
+                    <button class="btn btn-outline-primary btn-sm me-2" onclick="showAdminPanel()">
+                        <i class="fas fa-cogs"></i> Admin
+                    </button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-sm me-2" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+                <span class="badge bg-primary">T&E Analysis Chatbot</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenu principal -->
+    <div class="container">
+        <div class="main-container p-4">
             <!-- Status des documents T&E -->
             <div class="documents-status {% if documents_loaded %}loaded{% endif %}">
                 <div class="row align-items-center">
@@ -461,16 +569,15 @@
                                     
                                     <div class="ticket-upload-area mb-3" id="ticket-upload-area" 
                                         onclick="document.getElementById('ticket-upload').click()">
-                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--secondary-blue);"></i>
-                                        <p class="mb-0">Drop ticket here or click to upload</p>
-                                        <small class="text-muted">PDF, Images, Documents</small>
+                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--natixis-light-blue);"></i>
+                                        <p class="mb-0">Drop tickets here or click to upload</p>
+                                        <small class="text-muted">PDF, Images, Word, Excel, Text files</small>
                                     </div>
-                                    
-                                    <input type="file" id="ticket-upload" 
-                                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt" 
-                                        style="display:none" 
-                                        onchange="handleTicketUpload(this.files[0])">
-                                    
+                                        <input type="file" id="ticket-upload" 
+                                            accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.doc,.docx,.txt,.csv,.xlsx,.xls,.rtf" 
+                                            multiple
+                                            style="display:none" 
+                                            onchange="handleMultipleTicketUpload(this.files)">
                                     <div class="mb-3">
                                         <label for="question-input" class="form-label">Question about this ticket:</label>
                                         <textarea id="question-input" class="form-control" rows="3" 

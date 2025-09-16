@@ -68,150 +68,229 @@ class TEDocumentProcessor:
             logger.error(f"Erreur traitement fichier Excel {filename}: {e}")
             raise Exception(f"Impossible de traiter le fichier Excel: {str(e)}")
     
+
     def _process_excel_sheet(self, df: pd.DataFrame, sheet_name: str) -> List[Dict]:
-        """
-        Traite une feuille Excel spécifique
-        
-        Args:
-            df: DataFrame pandas de la feuille
-            sheet_name: Nom de la feuille
-            
-        Returns:
-            Liste des règles extraites
-        """
-        rules = []
-        
+        """Traite une feuille Excel selon son type spécifique"""
         try:
             # Nettoyer le DataFrame
-            df = df.dropna(how='all')  # Supprimer les lignes complètement vides
-            df = df.fillna('')  # Remplacer NaN par chaîne vide
-            
-            # Standardiser les noms de colonnes
+            df = df.dropna(how='all')
+            df = df.fillna('')
             df.columns = df.columns.astype(str).str.strip()
             
-            # Colonnes attendues dans les fichiers T&E
-            expected_columns = ['CRN_KEY', 'ID_01', 'TYPE', 'AMOUNT1', 'AMOUNT2']
-            
-            # Vérifier les colonnes disponibles
-            available_columns = df.columns.tolist()
-            logger.info(f"Colonnes disponibles dans {sheet_name}: {available_columns}")
-            
-            # Mapper les colonnes si nécessaire
-            column_mapping = self._map_columns(available_columns, expected_columns)
-            
-            # Traiter chaque ligne
-            for index, row in df.iterrows():
-                try:
-                    rule = self._extract_rule_from_row(row, column_mapping, sheet_name)
-                    if rule:
-                        rules.append(rule)
-                except Exception as e:
-                    logger.warning(f"Erreur ligne {index} dans {sheet_name}: {e}")
-                    continue
-            
-            return rules
-            
+            # Dispatcher selon le nom de la sheet
+            if sheet_name == "Breakfast & Lunch & Dinner":
+                return self._process_breakfast_lunch_dinner_sheet(df)
+            elif sheet_name in ["Internal staff Meal", "Hotel"]:
+                return self._process_standard_sheet(df, sheet_name)
+            else:
+                logger.warning(f"Type de sheet non reconnu: {sheet_name}")
+                return self._process_standard_sheet(df, sheet_name)
+                
         except Exception as e:
             logger.error(f"Erreur traitement feuille {sheet_name}: {e}")
             return []
     
-    def _map_columns(self, available_columns: List[str], expected_columns: List[str]) -> Dict[str, str]:
+    def _process_standard_sheet(self, df: pd.DataFrame, sheet_name: str) -> List[Dict]:
         """
-        Mappe les colonnes disponibles aux colonnes attendues
+        Traite les sheets 'Internal staff Meal' et 'Hotel'
+        Structure: CRN_KEY, TYPE, ID_01, AMOUNT1
+        """
+        rules = []
         
-        Args:
-            available_columns: Colonnes disponibles dans le fichier
-            expected_columns: Colonnes attendues
+        for index, row in df.iterrows():
+            try:
+                rule = {
+                    'sheet_name': sheet_name,
+                    'CRN_KEY': str(row.get('CRN_KEY', '')).strip().upper(),
+                    'ID_01': str(row.get('ID_01', '')).strip().upper(),
+                    'TYPE': str(row.get('TYPE', '')).strip(),
+                    'AMOUNT1': self._extract_numeric_value(row.get('AMOUNT1', 0))
+                }
+                
+                # Validation des données essentielles
+                if rule['CRN_KEY'] and rule['ID_01'] and rule['AMOUNT1'] > 0:
+                    rules.append(rule)
+                else:
+                    logger.debug(f"Ligne {index} ignorée dans {sheet_name}: données incomplètes")
+                    
+            except Exception as e:
+                logger.warning(f"Erreur ligne {index} dans {sheet_name}: {e}")
+                continue
+        
+        logger.info(f"Sheet {sheet_name}: {len(rules)} règles extraites")
+        return rules
+
+    def _process_breakfast_lunch_dinner_sheet(self, df: pd.DataFrame) -> List[Dict]:
+        """
+        Traite la sheet 'Breakfast & Lunch & Dinner' avec structure répétée
+        Structure: CRN_KEY (répété 2x), TYPE (Breakfast1 puis Meal1), ID_01 (répété 2x), AMOUNT1
+        """
+        rules = []
+        
+        # Identifier où commence la seconde série de CRN_KEY
+        crn_key_column = df['CRN_KEY'].tolist()
+        type_column = df['TYPE'].tolist()
+        
+        # Trouver le point de séparation entre Breakfast1 et Meal1
+        breakfast_end_index = None
+        meal_start_index = None
+        
+        for i, type_val in enumerate(type_column):
+            if str(type_val).strip() == 'Breakfast1' and breakfast_end_index is None:
+                continue
+            elif str(type_val).strip() == 'Meal1' and meal_start_index is None:
+                breakfast_end_index = i - 1 if i > 0 else 0
+                meal_start_index = i
+                break
+        
+        # Si on n'arrive pas à identifier la structure, traiter comme sheet standard
+        if meal_start_index is None:
+            logger.warning("Structure 'Breakfast & Lunch & Dinner' non reconnue, traitement standard")
+            return self._process_standard_sheet(df, "Breakfast & Lunch & Dinner")
+        
+        # Traiter la première partie (Breakfast1)
+        breakfast_rules = self._process_sheet_section(
+            df.iloc[:meal_start_index], 
+            "Breakfast & Lunch & Dinner", 
+            "Breakfast1"
+        )
+        
+        # Traiter la seconde partie (Meal1)
+        meal_rules = self._process_sheet_section(
+            df.iloc[meal_start_index:], 
+            "Breakfast & Lunch & Dinner", 
+            "Meal1"
+        )
+        
+        rules.extend(breakfast_rules)
+        rules.extend(meal_rules)
+        
+        logger.info(f"Sheet Breakfast & Lunch & Dinner: {len(breakfast_rules)} règles Breakfast1, {len(meal_rules)} règles Meal1")
+        return rules
+
+    def _extract_numeric_value(self, value) -> float:
+        """Extrait une valeur numérique robuste"""
+        if pd.isna(value) or value == '':
+            return 0.0
+        
+        try:
+            # Si c'est déjà un nombre
+            if isinstance(value, (int, float)):
+                return float(value)
             
-        Returns:
-            Mapping des colonnes
-        """
-        mapping = {}
-        
-        # Mapping exact d'abord
-        for col in expected_columns:
-            if col in available_columns:
-                mapping[col] = col
-        
-        # Mapping approximatif ensuite
-        approximations = {
-            'CRN_KEY': ['currency', 'devise', 'crn', 'curr'],
-            'ID_01': ['country', 'pays', 'location', 'id'],
-            'TYPE': ['type', 'category', 'categorie', 'description'],
-            'AMOUNT1': ['amount', 'limite', 'limit', 'montant', 'max'],
-            'AMOUNT2': ['amount2', 'limite2', 'limit2', 'montant2']
+            # Si c'est une chaîne, nettoyer
+            str_value = str(value).strip()
+            
+            # Supprimer les caractères non numériques sauf . et ,
+            import re
+            cleaned = re.sub(r'[^\d.,]', '', str_value)
+            
+            # Remplacer , par .
+            cleaned = cleaned.replace(',', '.')
+            
+            # Si plusieurs points, garder le dernier comme séparateur décimal
+            if cleaned.count('.') > 1:
+                parts = cleaned.split('.')
+                cleaned = ''.join(parts[:-1]) + '.' + parts[-1]
+            
+            return float(cleaned) if cleaned else 0.0
+            
+        except (ValueError, TypeError):
+            logger.warning(f"Impossible de convertir en nombre: {value}")
+            return 0.0
+
+    def validate_excel_structure(self, rules_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
+        """Valide la structure des données Excel pour le format T&E spécifique"""
+        validation_report = {
+            'is_valid': True,
+            'warnings': [],
+            'errors': [],
+            'summary': {}
         }
         
-        for expected, variations in approximations.items():
-            if expected not in mapping:
-                for available in available_columns:
-                    available_lower = available.lower().strip()
-                    if any(var.lower() in available_lower for var in variations):
-                        mapping[expected] = available
-                        break
+        expected_sheets = ["Internal staff Meal", "Hotel", "Breakfast & Lunch & Dinner"]
         
-        logger.info(f"Mapping colonnes: {mapping}")
-        return mapping
-    
-    def _extract_rule_from_row(self, row: pd.Series, column_mapping: Dict[str, str], sheet_name: str) -> Optional[Dict]:
-        """
-        Extrait une règle depuis une ligne de données
+        # Vérifier la présence des sheets attendues
+        missing_sheets = [sheet for sheet in expected_sheets if sheet not in rules_data]
+        if missing_sheets:
+            validation_report['warnings'].extend([f"Sheet manquante: {sheet}" for sheet in missing_sheets])
         
-        Args:
-            row: Ligne de données pandas
-            column_mapping: Mapping des colonnes
-            sheet_name: Nom de la feuille
+        # Analyser chaque sheet
+        for sheet_name, rules in rules_data.items():
+            sheet_validation = self._validate_sheet_specific(sheet_name, rules)
+            validation_report['summary'][sheet_name] = sheet_validation
             
-        Returns:
-            Règle extraite ou None
-        """
-        try:
-            rule = {
-                'sheet_name': sheet_name,
-                'CRN_KEY': '',
-                'ID_01': '',
-                'TYPE': '',
-                'AMOUNT1': 0,
-                'AMOUNT2': 0
-            }
+            if sheet_validation['errors']:
+                validation_report['errors'].extend(sheet_validation['errors'])
+                validation_report['is_valid'] = False
             
-            # Extraire les valeurs selon le mapping
-            for expected_col, actual_col in column_mapping.items():
-                if actual_col in row.index:
-                    value = row[actual_col]
-                    
-                    # Traitement spécial pour les montants
-                    if expected_col in ['AMOUNT1', 'AMOUNT2']:
-                        try:
-                            # Nettoyer et convertir en nombre
-                            if pd.isna(value) or value == '':
-                                rule[expected_col] = 0
-                            else:
-                                # Supprimer les caractères non numériques sauf . et ,
-                                cleaned_value = str(value).replace(',', '.').strip()
-                                # Extraire le nombre
-                                import re
-                                number_match = re.search(r'[\d.]+', cleaned_value)
-                                if number_match:
-                                    rule[expected_col] = float(number_match.group())
-                                else:
-                                    rule[expected_col] = 0
-                        except:
-                            rule[expected_col] = 0
-                    else:
-                        # Traitement pour les chaînes
-                        rule[expected_col] = str(value).strip() if not pd.isna(value) else ''
-            
-            # Vérifier que la règle est valide
-            if rule['CRN_KEY'] and rule['AMOUNT1'] > 0:
-                return rule
-            else:
-                return None
+            if sheet_validation['warnings']:
+                validation_report['warnings'].extend(sheet_validation['warnings'])
+        
+        return validation_report
+
+    def _validate_sheet_specific(self, sheet_name: str, rules: List[Dict]) -> Dict:
+        """Validation spécifique selon le type de sheet"""
+        validation = {
+            'rules_count': len(rules),
+            'currencies': set(),
+            'countries': set(),
+            'types': set(),
+            'errors': [],
+            'warnings': []
+        }
+        
+        for rule in rules:
+            validation['currencies'].add(rule.get('currency', ''))
+            validation['countries'].add(rule.get('country', ''))
+            validation['types'].add(rule.get('type', ''))
+        
+        # Validations spécifiques
+        if sheet_name == "Internal staff Meal":
+            if 'Meal1' not in validation['types']:
+                validation['warnings'].append("Type 'Meal1' attendu mais non trouvé")
+        
+        elif sheet_name == "Hotel":
+            if 'Hotel1' not in validation['types']:
+                validation['warnings'].append("Type 'Hotel1' attendu mais non trouvé")
+        
+        elif sheet_name == "Breakfast & Lunch & Dinner":
+            expected_types = {'Breakfast1', 'Meal1'}
+            missing_types = expected_types - validation['types']
+            if missing_types:
+                validation['warnings'].append(f"Types manquants: {missing_types}")
+        
+        # Convertir sets en listes pour JSON
+        validation['currencies'] = list(validation['currencies'])
+        validation['countries'] = list(validation['countries'])
+        validation['types'] = list(validation['types'])
+        
+        return validation
+
+    def _process_sheet_section(self, df_section: pd.DataFrame, sheet_name: str, expected_type: str) -> List[Dict]:
+        """Traite une section spécifique d'une sheet"""
+        rules = []
+        
+        for index, row in df_section.iterrows():
+            try:
+                rule = {
+                    'sheet_name': sheet_name,
+                    'currency': str(row.get('CRN_KEY', '')).strip().upper(),
+                    'country': str(row.get('ID_01', '')).strip().upper(),
+                    'type': expected_type,  # Forcer le type attendu
+                    'amount_limit': self._extract_numeric_value(row.get('AMOUNT1', 0))
+                }
                 
-        except Exception as e:
-            logger.warning(f"Erreur extraction règle: {e}")
-            return None
-    
+                # Validation
+                if rule['currency'] and rule['country'] and rule['amount_limit'] > 0:
+                    rules.append(rule)
+                    
+            except Exception as e:
+                logger.warning(f"Erreur ligne {index} section {expected_type}: {e}")
+                continue
+        
+        return rules
+
     def process_word_policies(self, file_content: bytes, filename: str) -> str:
         """
         Traite un fichier Word contenant les politiques T&E
@@ -321,91 +400,7 @@ class TEDocumentProcessor:
             
             For detailed policies, please refer to the original document or contact T&E team.
             """
-    
-    def validate_excel_structure(self, rules_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
-        """
-        Valide la structure des données Excel extraites
-        
-        Args:
-            rules_data: Données extraites
-            
-        Returns:
-            Rapport de validation
-        """
-        validation_report = {
-            'is_valid': True,
-            'warnings': [],
-            'errors': [],
-            'summary': {}
-        }
-        
-        try:
-            total_rules = 0
-            currencies = set()
-            countries = set()
-            
-            for sheet_name, rules in rules_data.items():
-                sheet_summary = {
-                    'rules_count': len(rules),
-                    'currencies': set(),
-                    'countries': set(),
-                    'has_amounts': 0
-                }
-                
-                for rule in rules:
-                    total_rules += 1
-                    
-                    # Collecter les devises
-                    if rule.get('CRN_KEY'):
-                        currencies.add(rule['CRN_KEY'])
-                        sheet_summary['currencies'].add(rule['CRN_KEY'])
-                    
-                    # Collecter les pays
-                    if rule.get('ID_01'):
-                        countries.add(rule['ID_01'])
-                        sheet_summary['countries'].add(rule['ID_01'])
-                    
-                    # Vérifier les montants
-                    if rule.get('AMOUNT1', 0) > 0:
-                        sheet_summary['has_amounts'] += 1
-                
-                validation_report['summary'][sheet_name] = {
-                    'rules_count': sheet_summary['rules_count'],
-                    'currencies': list(sheet_summary['currencies']),
-                    'countries': list(sheet_summary['countries']),
-                    'has_amounts': sheet_summary['has_amounts']
-                }
-                
-                # Vérifications
-                if sheet_summary['rules_count'] == 0:
-                    validation_report['warnings'].append(f"Feuille '{sheet_name}' ne contient aucune règle valide")
-                
-                if sheet_summary['has_amounts'] == 0:
-                    validation_report['warnings'].append(f"Feuille '{sheet_name}' ne contient aucun montant valide")
-            
-            validation_report['summary']['total'] = {
-                'rules_count': total_rules,
-                'currencies': list(currencies),
-                'countries': list(countries),
-                'sheets_count': len(rules_data)
-            }
-            
-            # Vérifications globales
-            if total_rules == 0:
-                validation_report['is_valid'] = False
-                validation_report['errors'].append("Aucune règle valide trouvée dans le fichier Excel")
-            
-            if len(currencies) == 0:
-                validation_report['warnings'].append("Aucune devise trouvée dans les règles")
-            
-            logger.info(f"Validation Excel: {total_rules} règles, {len(currencies)} devises, {len(countries)} pays")
-            
-        except Exception as e:
-            validation_report['is_valid'] = False
-            validation_report['errors'].append(f"Erreur lors de la validation: {str(e)}")
-        
-        return validation_report
-    
+
     def export_rules_json(self, rules_data: Dict[str, List[Dict]], output_path: str) -> bool:
         """
         Exporte les règles au format JSON
@@ -440,38 +435,12 @@ class TEDocumentProcessor:
         except Exception as e:
             logger.error(f"Erreur export JSON: {e}")
             return False
-
-
-def test_te_processor():
-    """Teste le processeur T&E avec des données simulées"""
-    processor = TEDocumentProcessor()
-    
-    print("=== Test TEDocumentProcessor ===")
-    
-    # Créer des données Excel simulées
-    test_data = {
-        'Internal staff Meal': [
-            {'CRN_KEY': 'EUR', 'ID_01': 'FR', 'TYPE': 'Lunch', 'AMOUNT1': 25.0, 'AMOUNT2': 0},
-            {'CRN_KEY': 'USD', 'ID_01': 'US', 'TYPE': 'Lunch', 'AMOUNT1': 30.0, 'AMOUNT2': 0},
-        ],
-        'Hotel': [
-            {'CRN_KEY': 'EUR', 'ID_01': 'FR', 'TYPE': 'Standard', 'AMOUNT1': 150.0, 'AMOUNT2': 0},
-            {'CRN_KEY': 'USD', 'ID_01': 'US', 'TYPE': 'Standard', 'AMOUNT1': 180.0, 'AMOUNT2': 0},
-        ]
-    }
-    
-    # Valider la structure
-    validation = processor.validate_excel_structure(test_data)
-    print(f"Validation: {validation['is_valid']}")
-    print(f"Règles total: {validation['summary']['total']['rules_count']}")
-    print(f"Devises: {validation['summary']['total']['currencies']}")
-    print(f"Avertissements: {len(validation['warnings'])}")
-    
-    # Test processing Word
-    test_word_content = b"Test policy document content"
-    word_result = processor.process_word_policies(test_word_content, "test_policy.docx")
-    print(f"Texte Word extrait: {len(word_result)} caractères")
-
-
-if __name__ == "__main__":
-    test_te_processor()
+        
+    def create_searchable_index(self, rules_data: Dict[str, List[Dict]]) -> Dict:
+        """Crée un index pour recherche rapide par critères"""
+        index = {}
+        for sheet_name, rules in rules_data.items():
+            for rule in rules:
+                key = f"{rule['currency']}_{rule['country']}_{rule['type']}"
+                index[key] = rule
+        return index
