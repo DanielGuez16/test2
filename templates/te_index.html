@@ -80,6 +80,52 @@
         .word-section { margin-bottom: 2rem; }
         .section-title { color: var(--natixis-blue) !important; font-weight: 600; margin-bottom: 1rem; }
         .section-content { text-align: justify; color: #333; }
+
+        /* Upload de tickets */
+        .ticket-upload-area {
+            border: 2px dashed var(--natixis-light-blue);
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            margin-bottom: 1rem;
+        }
+
+        .ticket-upload-area:hover {
+            border-color: var(--natixis-green);
+            background: rgba(0, 166, 81, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .ticket-upload-area.drag-over {
+            border-color: var(--natixis-green) !important;
+            background: rgba(0, 166, 81, 0.1) !important;
+            transform: scale(1.02);
+        }
+
+        .ticket-upload-area i {
+            display: block;
+            font-size: 2rem;
+            color: var(--natixis-light-blue);
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-upload-area:hover i {
+            color: var(--natixis-green);
+        }
+
+        .ticket-upload-area p {
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .ticket-upload-area small {
+            color: #666;
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
