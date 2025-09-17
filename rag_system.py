@@ -1,7 +1,6 @@
 import re
 import logging
 from typing import List, Dict, Any, Optional
-from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 import hashlib
