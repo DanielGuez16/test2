@@ -331,12 +331,8 @@ async def analyze_ticket(
         # Lire le ticket (garder ta logique existante)
         ticket_content = await ticket_file.read()
         ticket_info = extract_ticket_information(ticket_content, ticket_file.filename)
-        
-        analyzer = TicketAnalyzer(rag_system, llm_connector)
-        
-        analysis_result = analyzer.analyze_ticket(ticket_info, question)
                 
-                # Au début de la méthode analyze_ticket
+        # Au début de la méthode analyze_ticket
         if not ticket_info.get("amount") and not ticket_info.get("currency"):
             return {
                 "status": "invalid_ticket",
@@ -345,6 +341,9 @@ async def analyze_ticket(
                 "applied_rules": []
             }
         
+        analyzer = TicketAnalyzer(rag_system, llm_connector)
+        analysis_result = analyzer.analyze_ticket(ticket_info, question)
+
         # Sauvegarder l'analyse
         analysis_record = {
             "timestamp": datetime.now().isoformat(),
@@ -1347,6 +1346,9 @@ def detect_location_from_text(text: str) -> dict:
 
 def categorize_expense_enhanced(text: str) -> dict:
     """Catégorisation améliorée des dépenses"""
+    if not text:  # AJOUTER cette vérification
+        return {"category": "unknown", "confidence": 0.0}
+    
     text_lower = text.lower()
     
     # Définitions de catégories avec scores de confiance
@@ -1405,6 +1407,9 @@ def categorize_expense_enhanced(text: str) -> dict:
 
 def extract_vendor_info(text: str) -> dict:
     """Extraction des informations du vendeur/établissement"""
+    if not text:  # AJOUTER cette vérification
+        return {"name": None, "confidence": 0.0}
+
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     
     if not lines:
