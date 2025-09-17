@@ -499,6 +499,17 @@
             color: var(--natixis-blue);
         }
 
+        .btn-pill{ border-radius:9999px; padding:.35rem .75rem; }
+
+        .btn-soft-primary{ background: rgba(118,39,155,.08); color: var(--natixis-blue); border:1px solid rgba(118,39,155,.15); }
+        
+        .btn-soft-primary:hover{ background: rgba(118,39,155,.15); }
+        
+        .btn-soft-secondary{ background: rgba(171,84,212,.08); color: var(--natixis-light-blue); border:1px solid rgba(171,84,212,.15); }
+        
+        .btn-soft-secondary:hover{ background: rgba(171,84,212,.15); }
+
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -585,20 +596,16 @@
                     </div>
                     <div class="col-md-6 text-end">
                         {% if te_documents.load_status == 'loaded' %}
-                            <button class="btn btn-outline-primary btn-sm me-2" onclick="viewExcelDocument()">
-                                <i class="fas fa-table me-1"></i>
-                                View Excel Rules
+                        <div class="btn-group gap-1">
+                            <button class="btn btn-soft-primary btn-pill btn-sm" onclick="viewExcelDocument()"
+                                    title="Preview Excel rules">
+                            <i class="fas fa-table me-1"></i> Excel
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-2" onclick="viewWordDocument()">
-                                <i class="fas fa-file-word me-1"></i>
-                                View Word Policies
+                            <button class="btn btn-soft-secondary btn-pill btn-sm" onclick="viewWordDocument()"
+                                    title="Preview Word policies">
+                            <i class="fas fa-file-word me-1"></i> Word
                             </button>
-                        {% endif %}
-                        {% if user.role == 'admin' %}
-                            <button class="btn btn-outline-warning btn-sm" onclick="refreshDocuments()">
-                                <i class="fas fa-sync me-1"></i>
-                                Refresh
-                            </button>
+                        </div>
                         {% endif %}
                     </div>
                     <div class="flex gap-8 items-end">
