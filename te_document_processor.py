@@ -67,8 +67,7 @@ class TEDocumentProcessor:
         except Exception as e:
             logger.error(f"Erreur traitement fichier Excel {filename}: {e}")
             raise Exception(f"Impossible de traiter le fichier Excel: {str(e)}")
-    
-
+        
     def _process_excel_sheet(self, df: pd.DataFrame, sheet_name: str) -> List[Dict]:
         """Traite une feuille Excel selon son type spécifique"""
         try:
