@@ -453,6 +453,12 @@ function displaySingleAnalysisResult(result) {
             ` : ''}
         </div>
         
+        <div class="mt-2 text-end">
+            <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
+                <i class="fas fa-star me-1"></i> Rate this analysis
+            </button>
+        </div>
+
         <div class="mt-2">
             <h6>AI Analysis:</h6>
             <div class="bg-light p-2 rounded">
