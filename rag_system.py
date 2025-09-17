@@ -18,6 +18,8 @@ class TERAGSystem:
         except Exception as e:
             logger.warning(f"Erreur chargement EMBEDDINGConnector: {e}")
             self.embedding_connector = None
+        
+        self.model = None  # Pour compatibilité avec le code existant
 
         # Initialiser ChromaDB en mode persistant local
         try:
@@ -209,7 +211,7 @@ class TERAGSystem:
                 relevant_rules.extend(exact_rules)
             
             # 2. Recherche vectorielle si disponible
-            if self.model and self.rules_collection:
+            if self.embedding_connector and self.rules_collection:
                 try:
                     vector_rules = self._search_vector_rules(query, filters)
                     relevant_rules.extend(vector_rules)
@@ -237,7 +239,7 @@ class TERAGSystem:
             relevant_sections = []
             
             # Recherche vectorielle si disponible
-            if self.model and self.policies_collection:
+            if self.embedding_connector and self.policies_collection:
                 try:
                     results = self.policies_collection.query(
                         query_embeddings=[self.model.encode([topic]).tolist()[0]],
@@ -390,6 +392,6 @@ class TERAGSystem:
         return {
             "rules_indexed": len(self.rules_index),
             "policies_chunks": len(self.policies_chunks),
-            "embedding_model_available": self.model is not None,
+            "embedding_model_available": self.embedding_connector is not None, 
             "chroma_available": self.rules_collection is not None
         }
