@@ -439,40 +439,72 @@ class TEDocumentProcessor:
                 key = f"{rule['currency']}_{rule['country']}_{rule['type']}"
                 index[key] = rule
         return index
-    
-    def process_excel_rules_from_dict(self, excel_dict: dict, filename: str) -> Dict[str, List[Dict]]:
-        """Traite les règles Excel depuis un dictionnaire (depuis SharePoint)"""
+
+    def process_excel_rules_from_dict(self, excel_dict, filename: str) -> Dict[str, List[Dict]]:
+        """Traite les règles Excel depuis un dictionnaire (ou une liste) provenant de SharePoint"""
         try:
             logger.info(f"Traitement du dictionnaire Excel: {filename}")
-            
-            rules_data = {}
-            
-            # Traiter chaque feuille du dictionnaire
-            for sheet_name, df in excel_dict.items():
+
+            # --- Normalisation en {sheet_name: DataFrame} quel que soit le format d'entrée ---
+            sheets: Dict[str, pd.DataFrame] = {}
+
+            if isinstance(excel_dict, dict):
+                # Deux cas possibles:
+                #  A) {sheet_name -> (list[dict] | dict_col->list | DataFrame)}
+                #  B) {col -> list} d’une seule feuille (pas de noms de feuilles)
+                looks_like_sheet_map = any(
+                    isinstance(v, (list, pd.DataFrame, dict)) for v in excel_dict.values()
+                )
+
+                if looks_like_sheet_map:
+                    # Traite chaque valeur comme une feuille potentielle
+                    for k, v in excel_dict.items():
+                        if isinstance(v, pd.DataFrame):
+                            sheets[str(k)] = v
+                        elif isinstance(v, list):
+                            sheets[str(k)] = pd.DataFrame(v)
+                        elif isinstance(v, dict):
+                            # Probable dict colonnes -> listes
+                            if all(isinstance(col_v, (list, tuple)) for col_v in v.values()):
+                                sheets[str(k)] = pd.DataFrame(v)
+                            else:
+                                # Dernier recours : DataFrame direct
+                                sheets[str(k)] = pd.DataFrame(v)
+                        else:
+                            logger.warning(f"Format inattendu pour la feuille {k}: {type(v)}")
+                else:
+                    # Probable dict colonnes -> listes pour une seule feuille, sans nom
+                    sheets["Sheet1"] = pd.DataFrame(excel_dict)
+
+            elif isinstance(excel_dict, list):
+                # Liste de lignes pour une seule feuille
+                sheets["Sheet1"] = pd.DataFrame(excel_dict)
+            else:
+                raise TypeError(f"Format Excel inattendu: {type(excel_dict)}")
+
+            # --- Traitement métier ---
+            rules_data: Dict[str, List[Dict]] = {}
+            for sheet_name, df in sheets.items():
                 logger.info(f"Traitement de la feuille: {sheet_name}")
-                
                 try:
-                    # Convertir en DataFrame si ce n'est pas déjà fait
                     if not isinstance(df, pd.DataFrame):
                         df = pd.DataFrame(df)
-                    
-                    # Nettoyer et traiter les données
+
                     sheet_rules = self._process_excel_sheet(df, sheet_name)
-                    
                     if sheet_rules:
                         rules_data[sheet_name] = sheet_rules
                         logger.info(f"Feuille {sheet_name}: {len(sheet_rules)} règles extraites")
-                    
                 except Exception as e:
                     logger.warning(f"Erreur traitement feuille {sheet_name}: {e}")
                     continue
-            
+
             logger.info(f"Traitement Excel terminé: {len(rules_data)} feuilles traitées")
             return rules_data
-            
+
         except Exception as e:
-            logger.error(f"Erreur traitement dictionnaire Excel {filename}: {e}")
+            logger.exception(f"Erreur traitement dictionnaire Excel {filename}: {e}")
             raise Exception(f"Impossible de traiter le dictionnaire Excel: {str(e)}")
+
 
     def process_word_policies_from_text(self, text: str, filename: str) -> str:
         """Traite les politiques Word depuis du texte (depuis SharePoint)"""
