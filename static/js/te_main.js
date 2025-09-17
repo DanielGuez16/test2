@@ -1619,6 +1619,68 @@ async function makeAPICall(url, options = {}) {
     }
 }
 
+window.viewExcelDocument = async function(){
+  const modalEl = document.getElementById('excelViewModal');
+  if(!modalEl){ console.error('excelViewModal introuvable'); return; }
+  const modal = new bootstrap.Modal(modalEl);
+  const mount = document.getElementById('excel-content');
+  mount.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p class="mt-2">Loading Excel content...</p></div>`;
+  try{
+    const r = await fetch('/api/view-excel');
+    const data = await r.json();
+    if(!r.ok || !data.success) throw new Error(data.detail || 'Error viewing Excel');
+    // rendu simple: 1 table par feuille
+    const sheets = data.sheets || {};
+    let html = '';
+    Object.keys(sheets).forEach(name=>{
+      const {columns=[], rows=[]} = sheets[name] || {};
+      html += `<h6 class="mt-3">${name}</h6><div class="table-responsive"><table class="table table-sm table-hover"><thead><tr>`;
+      columns.forEach(c=> html += `<th>${c}</th>`);
+      html += `</tr></thead><tbody>`;
+      rows.forEach(row=>{
+        html += `<tr>${row.map(v=> `<td>${String(v ?? '')}</td>`).join('')}</tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+    mount.innerHTML = html || '<div class="text-muted">No data</div>';
+    modal.show();
+  }catch(e){
+    console.error(e);
+    mount.innerHTML = `<div class="alert alert-danger">Unable to load Excel preview.</div>`;
+    modal.show();
+  }
+};
+
+window.viewWordDocument = async function(){
+  const modalEl = document.getElementById('wordViewModal');
+  if(!modalEl){ console.error('wordViewModal introuvable'); return; }
+  const modal = new bootstrap.Modal(modalEl);
+  const mount = document.getElementById('word-content');
+  mount.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p class="mt-2">Loading Word content...</p></div>`;
+  try{
+    const r = await fetch('/api/view-word');
+    const data = await r.json();
+    if(!r.ok || !data.success) throw new Error(data.detail || 'Error viewing Word');
+    const sections = data.sections || [];
+    let html = `<div class="word-document-viewer">`;
+    sections.forEach(s=>{
+      html += `
+        <div class="word-section">
+          <h5 class="section-title">${s.title || ''}</h5>
+          <div class="section-content">${(s.content || '').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</div>
+        </div>`;
+    });
+    html += `</div>`;
+    mount.innerHTML = html || '<div class="text-muted">No content</div>';
+    modal.show();
+  }catch(e){
+    console.error(e);
+    mount.innerHTML = `<div class="alert alert-danger">Unable to load Word preview.</div>`;
+    modal.show();
+  }
+};
+
+
 // Fonction manquante pour gérer la sélection de fichier ticket
 function handleTicketFileSelect() {
     const fileInput = document.getElementById('ticket-upload');

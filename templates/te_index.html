@@ -537,33 +537,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- Preview Panel -->
-    <div id="preview-panel" class="hidden fixed right-4 top-4 bottom-4 w-[min(640px,calc(100vw-2rem))] bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-50">
-    <div class="flex items-center justify-between px-4 py-3 border-b">
-        <div class="font-semibold" id="preview-title">Prévisualisation</div>
-        <button id="preview-close" aria-label="Fermer">✕</button>
-    </div>
-    <div class="px-4 py-3">
-        <div class="mb-2 flex gap-2">
-        <button id="tab-docx" class="tab active">DOCX</button>
-        <button id="tab-excel" class="tab">Excel</button>
-        </div>
-        <div id="docx-view" class="preview-view">
-        <pre id="docx-text" style="white-space:pre-wrap; max-height:60vh; overflow:auto; margin:0;"></pre>
-        </div>
-        <div id="excel-view" class="preview-view hidden">
-        <div class="mb-2">
-            <label>Feuille:</label>
-            <select id="sheet-select"></select>
-        </div>
-        <div id="excel-table-wrapper" style="max-height:60vh; overflow:auto;">
-            <table id="excel-table" border="1" cellpadding="6" style="border-collapse:collapse; width:100%; font-size:14px;"></table>
-        </div>
-        </div>
-    </div>
-    </div>
-
     <!-- Contenu principal -->
     <div class="container">
         <div class="main-container p-4">
@@ -609,17 +582,6 @@
                         {% endif %}
                     </div>
                     <div class="flex gap-8 items-end">
-                        <div>
-                            <label for="docx-path">Règles (DOCX) – SharePoint path</label>
-                            <input id="docx-path" type="text" placeholder="/sites/.../Regles.docx" />
-                            <button id="btn-preview-docx">Aperçu DOCX</button>
-                        </div>
-                        <div>
-                            <label for="excel-path">Barèmes (Excel) – SharePoint path</label>
-                            <input id="excel-path" type="text" placeholder="/sites/.../Baremes.xlsx" />
-                            <button id="btn-preview-excel">Aperçu Excel</button>
-                        </div>
-                        </div>
                 </div>
             </div>
 
@@ -907,53 +869,53 @@
                 </div>
             </div>
         </div>
-        <!-- Modal visualisation Excel -->
-        <div class="modal fade" id="excelViewModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-file-excel text-success me-2"></i>
-                            Excel Rules Document
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                        <div id="excel-content">
-                            <div class="text-center">
-                                <div class="spinner-custom"></div>
-                                <p class="mt-2">Loading Excel content...</p>
-                            </div>
-                        </div>
-                    </div>
+    </div>
+    {% endif %}
+    <!-- Modal visualisation Excel -->
+    <div class="modal fade" id="excelViewModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-excel text-success me-2"></i>
+                        Excel Rules Document
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Modal visualisation Word -->
-        <div class="modal fade" id="wordViewModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-file-word text-primary me-2"></i>
-                            Word Policies Document
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                        <div id="word-content">
-                            <div class="text-center">
-                                <div class="spinner-custom"></div>
-                                <p class="mt-2">Loading Word content...</p>
-                            </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <div id="excel-content">
+                        <div class="text-center">
+                            <div class="spinner-custom"></div>
+                            <p class="mt-2">Loading Excel content...</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
+
+    <!-- Modal visualisation Word -->
+    <div class="modal fade" id="wordViewModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-word text-primary me-2"></i>
+                        Word Policies Document
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <div id="word-content">
+                        <div class="text-center">
+                            <div class="spinner-custom"></div>
+                            <p class="mt-2">Loading Word content...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
