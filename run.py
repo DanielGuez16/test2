@@ -335,6 +335,15 @@ async def analyze_ticket(
         analyzer = TicketAnalyzer(rag_system, llm_connector)
         
         analysis_result = analyzer.analyze_ticket(ticket_info, question)
+                
+                # Au début de la méthode analyze_ticket
+        if not ticket_info.get("amount") and not ticket_info.get("currency"):
+            return {
+                "status": "invalid_ticket",
+                "ai_response": "Unable to extract expense information from this document. Please ensure the ticket contains clear amount and currency information.",
+                "basic_validation": {"is_valid": False, "status": "error"},
+                "applied_rules": []
+            }
         
         # Sauvegarder l'analyse
         analysis_record = {
@@ -881,7 +890,7 @@ def parse_ticket_text_enhanced(text: str) -> dict:
                         cleaned_amount = clean_amount_string(amount_str)
                         if cleaned_amount and 0.01 <= cleaned_amount <= 100000:  # Plage raisonnable
                             info["amount"] = cleaned_amount
-                            info["currency"] = (currency_str)
+                            info["currency"] = normalize_currency(currency_str) if currency_str else None
                             confidence_factors.append(0.3 - (i * 0.05))  # Plus de confiance pour les premiers patterns
                             amount_found = True
                             break
@@ -1247,6 +1256,8 @@ def clean_amount_string(amount_str: str) -> float:
 
 def normalize_currency(currency_str: str) -> str:
     """Normalise les codes de devise"""
+    if not currency_str:
+        return "EUR"  # Valeur par défaut
     currency_map = {
         '€': 'EUR', '$': 'USD', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
         'euro': 'EUR', 'dollar': 'USD', 'pound': 'GBP', 'yen': 'JPY'
