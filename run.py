@@ -48,6 +48,9 @@ from llm_connector import LLMConnector
 from te_document_processor import TEDocumentProcessor
 from user_management import authenticate_user, log_activity, get_logs, USERS_DB
 
+from sharepoint_connector import SharePointClient
+from embedding_connector import EMBEDDINGConnector
+
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,7 +65,11 @@ active_sessions = {}
 te_documents = {
     "excel_rules": None,
     "word_policies": None,
-    "last_loaded": None
+    "excel_binary": None, 
+    "word_binary": None,   
+    "last_loaded": None,
+    "load_status": "not_loaded",  # "loading", "loaded", "error"
+    "error_message": None
 }
 
 # Session chatbot global
@@ -108,6 +115,58 @@ templates = Jinja2Templates(directory="templates")
 #                           API ROUTES
 #######################################################################################################################################
 
+async def load_te_documents_from_sharepoint():
+    """Charge automatiquement les documents T&E depuis SharePoint"""
+    global te_documents
+    
+    try:
+        te_documents["load_status"] = "loading"
+        logger.info("Chargement automatique des documents T&E depuis SharePoint...")
+        
+        # Initialiser SharePoint client
+        sharepoint_client = SharePointClient()
+        
+        # Chemins SharePoint
+        excel_path = "Chatbot/sources/Consolidated Limits.xlsx"
+        word_path = "Chatbot/sources/APAC Travel Entertainment Procedure Mar2025_Clean.docx"
+        
+        # Charger Excel
+        excel_binary = sharepoint_client.read_binary_file(excel_path)
+        excel_dict = sharepoint_client.read_excel_file_as_dict(excel_binary)
+        excel_rules = te_processor.process_excel_rules_from_dict(excel_dict, "Consolidated Limits.xlsx")
+        
+        # Charger Word
+        word_binary = sharepoint_client.read_binary_file(word_path)
+        word_text = sharepoint_client.read_docx_file_as_text(word_binary)
+        word_policies = te_processor.process_word_policies_from_text(word_text, "APAC Travel Entertainment Procedure.docx")
+        
+        # Stocker les résultats
+        te_documents.update({
+            "excel_rules": excel_rules,
+            "word_policies": word_policies,
+            "excel_binary": excel_binary,
+            "word_binary": word_binary,
+            "last_loaded": datetime.now().isoformat(),
+            "load_status": "loaded",
+            "error_message": None
+        })
+        
+        # Indexer dans le système RAG
+        logger.info("Indexation des documents dans le système RAG...")
+        rag_system.index_excel_rules(excel_rules)
+        rag_system.index_word_policies(word_policies)
+        
+        logger.info(f"Documents T&E chargés avec succès - {len(excel_rules)} feuilles Excel")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erreur chargement documents SharePoint: {e}")
+        te_documents.update({
+            "load_status": "error",
+            "error_message": str(e)
+        })
+        return False
+    
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Page d'accueil - redirige vers login si non connecté"""
@@ -459,6 +518,138 @@ async def analyze_multiple_tickets(
         "total_files": len(files)
     }
 
+@app.get("/api/view-excel")
+async def view_excel_document(session_token: Optional[str] = Cookie(None)):
+    """Retourne le contenu Excel formaté pour visualisation"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["excel_rules"]:
+        raise HTTPException(status_code=404, detail="Excel document not loaded")
+    
+    try:
+        # Formater les données Excel pour affichage tableau
+        formatted_data = {}
+        total_rules = 0
+        
+        for sheet_name, rules in te_documents["excel_rules"].items():
+            formatted_data[sheet_name] = {
+                "columns": ["Currency", "Country", "Type", "Amount Limit"],
+                "rows": []
+            }
+            
+            for rule in rules:
+                formatted_data[sheet_name]["rows"].append([
+                    rule.get("currency", "N/A"),
+                    rule.get("country", "N/A"), 
+                    rule.get("type", "N/A"),
+                    f"{rule.get('amount_limit', 0)}"
+                ])
+            
+            total_rules += len(rules)
+        
+        log_activity(current_user["username"], "VIEW_EXCEL", f"Viewed Excel document - {total_rules} rules")
+        
+        return {
+            "success": True,
+            "filename": "Consolidated Limits.xlsx",
+            "sheets": formatted_data,
+            "total_rules": total_rules,
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Excel: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Excel: {str(e)}")
+
+@app.get("/api/view-word")
+async def view_word_document(session_token: Optional[str] = Cookie(None)):
+    """Retourne le contenu Word pour visualisation PDF-like"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["word_policies"]:
+        raise HTTPException(status_code=404, detail="Word document not loaded")
+    
+    try:
+        # Formater le texte Word en sections pour un affichage PDF-like
+        sections = []
+        current_section = {"title": "Introduction", "content": ""}
+        
+        paragraphs = te_documents["word_policies"].split('\n\n')
+        
+        for paragraph in paragraphs:
+            if paragraph.strip():
+                # Détecter si c'est un titre (ligne courte avec mots-clés)
+                if (len(paragraph.strip()) < 100 and 
+                    any(keyword in paragraph.lower() for keyword in 
+                        ['policy', 'procedure', 'rule', 'expense', 'travel', 'accommodation', 'meal'])):
+                    
+                    # Sauvegarder la section précédente si elle a du contenu
+                    if current_section["content"].strip():
+                        sections.append(current_section.copy())
+                    
+                    # Commencer une nouvelle section
+                    current_section = {
+                        "title": paragraph.strip(),
+                        "content": ""
+                    }
+                else:
+                    current_section["content"] += paragraph + "\n\n"
+        
+        # Ajouter la dernière section
+        if current_section["content"].strip():
+            sections.append(current_section)
+        
+        log_activity(current_user["username"], "VIEW_WORD", f"Viewed Word document - {len(sections)} sections")
+        
+        return {
+            "success": True,
+            "filename": "APAC Travel Entertainment Procedure Mar2025_Clean.docx",
+            "sections": sections,
+            "total_sections": len(sections),
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Word: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
+
+@app.post("/api/refresh-documents")
+async def refresh_te_documents(session_token: Optional[str] = Cookie(None)):
+    """Force le rechargement des documents T&E depuis SharePoint"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        log_activity(current_user["username"], "REFRESH_DOCUMENTS", "Manual refresh of T&E documents")
+        
+        success = await load_te_documents_from_sharepoint()
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Documents refreshed successfully from SharePoint",
+                "last_loaded": te_documents["last_loaded"],
+                "status": te_documents["load_status"]
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Failed to refresh documents: {te_documents.get('error_message', 'Unknown error')}",
+                "status": te_documents["load_status"]
+            }
+            
+    except Exception as e:
+        logger.error(f"Erreur refresh documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error refreshing documents: {str(e)}")
+    
 #######################################################################################################################################
 #                           UTILITY FUNCTIONS
 #######################################################################################################################################
@@ -1367,6 +1558,12 @@ async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
             "success": False,
             "error": str(e)
         }
+    
+@app.on_event("startup")
+async def startup_event():
+    """Événements au démarrage de l'application"""
+    logger.info("🚀 Démarrage T&E Chatbot - Chargement des documents...")
+    await load_te_documents_from_sharepoint()
 
 if __name__ == "__main__":
     print("🚀 T&E Chatbot - APAC Region")

@@ -384,28 +384,84 @@ function handleTicketUpload(file) {
 }
 
 async function analyzeTicket() {
-    if (selectedFiles.length === 0) return;
+    if (!currentTicketFile) {
+        alert('Please upload a ticket first');
+        return;
+    }
     
     const formData = new FormData();
-    selectedFiles.forEach(file => {
-        formData.append('files', file);
-    });
+    formData.append('ticket_file', currentTicketFile);
     
     const question = document.getElementById('question-input').value;
     formData.append('question', question);
     
     try {
-        const response = await fetch('/api/analyze-multiple-tickets', {
+        const response = await fetch('/api/analyze-ticket', {
             method: 'POST',
             body: formData
         });
-        
+
         const data = await response.json();
-        displayAnalysisResults(data.results);
+        if (data.success) {
+            displaySingleAnalysisResult(data); 
+        } else {
+            alert('Analysis failed: ' + data.detail);
+        }
         
     } catch (error) {
         console.error('Erreur analyse:', error);
     }
+}
+
+function displaySingleAnalysisResult(result) {
+    const container = document.getElementById('ticket-status');
+    
+    if (!result.success) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Analysis Failed:</strong> ${result.detail || 'Unknown error'}
+            </div>
+        `;
+        return;
+    }
+    
+    const analysis = result.analysis_result;
+    const ticket = result.ticket_info;
+    
+    // Déterminer le statut CSS
+    let statusClass = 'warning';
+    if (analysis.basic_validation?.is_valid) statusClass = 'success';
+    else if (analysis.basic_validation?.status === 'error') statusClass = 'danger';
+    
+    container.innerHTML = `
+        <div class="alert alert-${statusClass}">
+            <h6><i class="fas fa-file me-2"></i>${ticket.filename}</h6>
+            <p><strong>Amount:</strong> ${ticket.amount} ${ticket.currency}</p>
+            <p><strong>Category:</strong> ${ticket.category}</p>
+            <p><strong>Status:</strong> ${analysis.basic_validation?.status || 'Unknown'}</p>
+            
+            ${analysis.applied_rules?.length ? `
+                <details>
+                    <summary>Applied Rules (${analysis.applied_rules.length})</summary>
+                    <ul class="mb-0 mt-2">
+                        ${analysis.applied_rules.map(rule => 
+                            `<li>${rule.sheet_name}: ${rule.amount_limit} ${rule.currency}</li>`
+                        ).join('')}
+                    </ul>
+                </details>
+            ` : ''}
+        </div>
+        
+        <div class="mt-2">
+            <h6>AI Analysis:</h6>
+            <div class="bg-light p-2 rounded">
+                ${analysis.ai_response || 'No AI response available'}
+            </div>
+        </div>
+    `;
+    
+    // Ajouter à l'historique
+    addToRecentHistory(result);
 }
 
 function displayAnalysisResults(results) {
@@ -971,6 +1027,298 @@ async function loadAdminFeedback() {
     }
 }
 
+// ===== VISUALISATION DES DOCUMENTS =====
+
+async function viewExcelDocument() {
+    console.log('Opening Excel document viewer...');
+    
+    try {
+        const modalElement = document.getElementById('excelViewModal');
+        if (!modalElement) {
+            alert('Excel viewer not available');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Charger le contenu Excel
+        await loadExcelContent();
+        
+    } catch (error) {
+        console.error('Error opening Excel viewer:', error);
+        alert('Error opening Excel document viewer');
+    }
+}
+
+async function viewWordDocument() {
+    console.log('Opening Word document viewer...');
+    
+    try {
+        const modalElement = document.getElementById('wordViewModal');
+        if (!modalElement) {
+            alert('Word viewer not available');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Charger le contenu Word
+        await loadWordContent();
+        
+    } catch (error) {
+        console.error('Error opening Word viewer:', error);
+        alert('Error opening Word document viewer');
+    }
+}
+
+async function loadExcelContent() {
+    const contentDiv = document.getElementById('excel-content');
+    if (!contentDiv) return;
+    
+    try {
+        const response = await fetch('/api/view-excel');
+        const result = await response.json();
+        
+        if (result.success) {
+            let html = `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6><i class="fas fa-file-excel text-success me-2"></i>${result.filename}</h6>
+                        <div>
+                            <span class="badge bg-primary">${result.total_rules} Rules</span>
+                            <span class="badge bg-secondary">${Object.keys(result.sheets).length} Sheets</span>
+                        </div>
+                    </div>
+                    <small class="text-muted">Last loaded: ${formatDateTime(result.last_loaded)}</small>
+                </div>
+            `;
+            
+            // Créer un accordéon pour chaque sheet
+            html += '<div class="accordion" id="excelAccordion">';
+            
+            Object.entries(result.sheets).forEach(([sheetName, sheetData], index) => {
+                const isFirst = index === 0;
+                html += `
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button ${!isFirst ? 'collapsed' : ''}" 
+                                    type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#sheet-${index}">
+                                <strong>${sheetName}</strong>
+                                <span class="badge bg-light text-dark ms-2">${sheetData.rows.length} rules</span>
+                            </button>
+                        </h2>
+                        <div id="sheet-${index}" 
+                             class="accordion-collapse collapse ${isFirst ? 'show' : ''}" 
+                             data-bs-parent="#excelAccordion">
+                            <div class="accordion-body">
+                                ${createExcelTable(sheetData)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            contentDiv.innerHTML = html;
+            
+        } else {
+            throw new Error(result.detail || 'Failed to load Excel content');
+        }
+        
+    } catch (error) {
+        console.error('Error loading Excel content:', error);
+        contentDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading Excel document: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function createExcelTable(sheetData) {
+    if (!sheetData.rows || sheetData.rows.length === 0) {
+        return '<div class="alert alert-info">No data available in this sheet</div>';
+    }
+    
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+    `;
+    
+    // Headers
+    sheetData.columns.forEach(column => {
+        html += `<th>${column}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Rows
+    sheetData.rows.forEach((row, rowIndex) => {
+        html += '<tr>';
+        row.forEach((cell, cellIndex) => {
+            // Formatage spécial pour les montants (dernière colonne)
+            if (cellIndex === row.length - 1 && !isNaN(cell)) {
+                html += `<td><strong class="text-success">${parseFloat(cell).toLocaleString()}</strong></td>`;
+            } else {
+                html += `<td>${escapeHtml(cell)}</td>`;
+            }
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    
+    // Ajouter un résumé
+    html += `
+        <div class="mt-3 p-2 bg-light rounded">
+            <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                ${sheetData.rows.length} rules in this sheet
+            </small>
+        </div>
+    `;
+    
+    return html;
+}
+
+async function loadWordContent() {
+    const contentDiv = document.getElementById('word-content');
+    if (!contentDiv) return;
+    
+    try {
+        const response = await fetch('/api/view-word');
+        const result = await response.json();
+        
+        if (result.success) {
+            let html = `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6><i class="fas fa-file-word text-primary me-2"></i>${result.filename}</h6>
+                        <div>
+                            <span class="badge bg-primary">${result.total_sections} Sections</span>
+                        </div>
+                    </div>
+                    <small class="text-muted">Last loaded: ${formatDateTime(result.last_loaded)}</small>
+                </div>
+            `;
+            
+            // Style PDF-like pour le contenu Word
+            html += '<div class="word-document-viewer">';
+            
+            result.sections.forEach((section, index) => {
+                html += `
+                    <div class="word-section mb-4">
+                        <h5 class="section-title text-primary border-bottom pb-2">
+                            ${escapeHtml(section.title)}
+                        </h5>
+                        <div class="section-content">
+                            ${formatWordContent(section.content)}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            contentDiv.innerHTML = html;
+            
+        } else {
+            throw new Error(result.detail || 'Failed to load Word content');
+        }
+        
+    } catch (error) {
+        console.error('Error loading Word content:', error);
+        contentDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading Word document: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function formatWordContent(content) {
+    // Formatage pour ressembler à un document PDF
+    return content
+        .split('\n\n')
+        .map(paragraph => {
+            if (paragraph.trim()) {
+                // Détecter les listes
+                if (paragraph.includes('•') || paragraph.includes('-')) {
+                    const listItems = paragraph.split(/[•-]/).filter(item => item.trim());
+                    if (listItems.length > 1) {
+                        let listHtml = '<ul class="list-unstyled ms-3">';
+                        listItems.forEach(item => {
+                            if (item.trim()) {
+                                listHtml += `<li class="mb-1"><i class="fas fa-chevron-right text-primary me-2"></i>${escapeHtml(item.trim())}</li>`;
+                            }
+                        });
+                        listHtml += '</ul>';
+                        return listHtml;
+                    }
+                }
+                
+                // Paragraphe normal
+                return `<p class="mb-3 text-justify">${escapeHtml(paragraph.trim())}</p>`;
+            }
+            return '';
+        })
+        .join('');
+}
+
+async function refreshDocuments() {
+    if (!confirm('Refresh T&E documents from SharePoint? This may take a few moments.')) {
+        return;
+    }
+    
+    try {
+        // Mettre à jour l'interface pour montrer le loading
+        const statusText = document.getElementById('documents-status-text');
+        if (statusText) {
+            statusText.innerHTML = `
+                <i class="fas fa-spinner fa-spin text-primary me-1"></i>
+                Refreshing documents from SharePoint...
+            `;
+        }
+        
+        const response = await fetch('/api/refresh-documents', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Rafraîchir la page pour mettre à jour l'interface
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+            addMessageToChat('assistant', 'T&E documents refreshed successfully from SharePoint!');
+        } else {
+            throw new Error(result.message || 'Failed to refresh documents');
+        }
+        
+    } catch (error) {
+        console.error('Error refreshing documents:', error);
+        
+        // Restaurer le status d'erreur
+        const statusText = document.getElementById('documents-status-text');
+        if (statusText) {
+            statusText.innerHTML = `
+                <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                Error refreshing documents: ${error.message}
+            `;
+        }
+        
+        alert('Error refreshing documents: ' + error.message);
+    }
+}
+
 // ===== AUTHENTIFICATION =====
 
 async function logout() {
@@ -1132,6 +1480,9 @@ window.logout = logout;
 window.clearChat = clearChat;
 window.sendMessage = sendMessage;
 window.analyzeTicket = analyzeTicket;
+window.viewExcelDocument = viewExcelDocument;
+window.viewWordDocument = viewWordDocument;
+window.refreshDocuments = refreshDocuments;
 
 // ===== GESTION D'ERREURS =====
 

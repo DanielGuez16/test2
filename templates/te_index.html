@@ -452,6 +452,53 @@
             margin-left: auto;
         }
 
+        /* Styles pour le viewer Word PDF-like */
+        .word-document-viewer {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-family: 'Times New Roman', serif;
+            line-height: 1.6;
+        }
+
+        .word-section {
+            margin-bottom: 2rem;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            color: var(--natixis-blue) !important;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .section-content {
+            text-align: justify;
+            color: #333;
+        }
+
+        .section-content p {
+            margin-bottom: 1rem;
+            text-indent: 1rem;
+        }
+
+        /* Tableau Excel amélioré */
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(118, 39, 155, 0.05);
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: var(--natixis-very-light-blue);
+            color: var(--natixis-blue);
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -486,29 +533,47 @@
             <!-- Status des documents T&E -->
             <div class="documents-status {% if documents_loaded %}loaded{% endif %}">
                 <div class="row align-items-center">
-                    <div class="col-md-8">
+                    <div class="col-md-6">
                         <h5 class="mb-1">
                             <i class="fas fa-folder-open me-2"></i>
                             T&E Documents Status
                         </h5>
-                        <p class="mb-0">
-                            {% if documents_loaded %}
+                        <p class="mb-0" id="documents-status-text">
+                            {% if te_documents.load_status == 'loaded' %}
                                 <i class="fas fa-check-circle text-success me-1"></i>
-                                Documents loaded successfully
-                                {% if last_loaded %}
-                                    ({{ last_loaded[:16] }})
+                                Documents loaded automatically from SharePoint
+                                {% if te_documents.last_loaded %}
+                                    ({{ te_documents.last_loaded[:16] }})
                                 {% endif %}
+                            {% elif te_documents.load_status == 'loading' %}
+                                <i class="fas fa-spinner fa-spin text-primary me-1"></i>
+                                Loading documents from SharePoint...
+                            {% elif te_documents.load_status == 'error' %}
+                                <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                                Error: {{ te_documents.error_message[:100] }}...
                             {% else %}
-                                <i class="fas fa-exclamation-triangle text-warning me-1"></i>
-                                Please load T&E documents to begin analysis
+                                <i class="fas fa-clock text-warning me-1"></i>
+                                Documents not loaded yet
                             {% endif %}
                         </p>
                     </div>
-                    <div class="col-md-4 text-end">
-                        <button class="btn btn-primary" onclick="showDocumentUpload()">
-                            <i class="fas fa-upload me-2"></i>
-                            Load T&E Documents
-                        </button>
+                    <div class="col-md-6 text-end">
+                        {% if te_documents.load_status == 'loaded' %}
+                            <button class="btn btn-outline-primary btn-sm me-2" onclick="viewExcelDocument()">
+                                <i class="fas fa-table me-1"></i>
+                                View Excel Rules
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm me-2" onclick="viewWordDocument()">
+                                <i class="fas fa-file-word me-1"></i>
+                                View Word Policies
+                            </button>
+                        {% endif %}
+                        {% if user.role == 'admin' %}
+                            <button class="btn btn-outline-warning btn-sm" onclick="refreshDocuments()">
+                                <i class="fas fa-sync me-1"></i>
+                                Refresh
+                            </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -793,6 +858,51 @@
                         </div>
                         <div class="tab-pane" id="feedback-tab">
                             <div id="admin-feedback">Loading feedback...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Modal visualisation Excel -->
+        <div class="modal fade" id="excelViewModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-file-excel text-success me-2"></i>
+                            Excel Rules Document
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                        <div id="excel-content">
+                            <div class="text-center">
+                                <div class="spinner-custom"></div>
+                                <p class="mt-2">Loading Excel content...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal visualisation Word -->
+        <div class="modal fade" id="wordViewModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-file-word text-primary me-2"></i>
+                            Word Policies Document
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                        <div id="word-content">
+                            <div class="text-center">
+                                <div class="spinner-custom"></div>
+                                <p class="mt-2">Loading Word content...</p>
+                            </div>
                         </div>
                     </div>
                 </div>

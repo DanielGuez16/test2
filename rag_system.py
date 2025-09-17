@@ -12,12 +12,13 @@ class TERAGSystem:
     def __init__(self):
         # Initialiser le modèle d'embedding
         try:
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Modèle d'embedding initialisé avec succès")
+            from embedding_connector import EMBEDDINGConnector
+            self.embedding_connector = EMBEDDINGConnector()
+            logger.info("EMBEDDINGConnector initialisé avec succès")
         except Exception as e:
-            logger.warning(f"Erreur chargement modèle embedding: {e}, utilisation fallback")
-            self.model = None
-        
+            logger.warning(f"Erreur chargement EMBEDDINGConnector: {e}")
+            self.embedding_connector = None
+
         # Initialiser ChromaDB en mode persistant local
         try:
             self.chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
@@ -46,7 +47,7 @@ class TERAGSystem:
                     metadata={"hnsw:space": "cosine"}
                 )
             except Exception:
-                # Collection existe déjà
+                # Collection existe déjà 
                 self.rules_collection = self.chroma_client.get_collection(collection_name)
                 self.rules_collection.delete()  # Nettoyer pour réindexer
                 self.rules_collection = self.chroma_client.create_collection(
@@ -83,17 +84,21 @@ class TERAGSystem:
                     
                     rule_id += 1
             
-            # Indexer dans ChromaDB si embeddings disponibles
-            if self.model and documents:
+            # Indexer dans ChromaDB avec notre embedding connector
+            if self.embedding_connector and documents:
                 try:
-                    embeddings = self.model.encode(documents).tolist()
+                    embeddings = []
+                    for doc in documents:
+                        embedding = self.embedding_connector.generate_embeddings(doc)
+                        embeddings.append(embedding)
+                    
                     self.rules_collection.add(
                         embeddings=embeddings,
                         documents=documents,
                         metadatas=metadatas,
                         ids=ids
                     )
-                    logger.info(f"Indexé {len(documents)} règles dans ChromaDB")
+                    logger.info(f"Indexé {len(documents)} règles dans ChromaDB avec EMBEDDINGConnector")
                 except Exception as e:
                     logger.warning(f"Erreur indexation ChromaDB: {e}")
             
@@ -101,7 +106,7 @@ class TERAGSystem:
             
         except Exception as e:
             logger.error(f"Erreur indexation règles Excel: {e}")
-    
+
     def index_word_policies(self, policies_text: str):
         """Indexe les politiques Word par sections"""
         try:
@@ -125,21 +130,25 @@ class TERAGSystem:
                     metadata={"hnsw:space": "cosine"}
                 )
             
-            # Indexer les sections si embeddings disponibles
-            if self.model and sections:
+            # Indexer les sections avec notre embedding connector
+            if self.embedding_connector and sections:
                 try:
                     documents = [section["text"] for section in sections]
                     metadatas = [{"section_type": section["type"], "keywords": section["keywords"]} for section in sections]
                     ids = [f"policy_{i}" for i in range(len(sections))]
                     
-                    embeddings = self.model.encode(documents).tolist()
+                    embeddings = []
+                    for doc in documents:
+                        embedding = self.embedding_connector.generate_embeddings(doc)
+                        embeddings.append(embedding)
+                    
                     self.policies_collection.add(
                         embeddings=embeddings,
                         documents=documents,
                         metadatas=metadatas,
                         ids=ids
                     )
-                    logger.info(f"Indexé {len(sections)} sections de politiques")
+                    logger.info(f"Indexé {len(sections)} sections de politiques avec EMBEDDINGConnector")
                 except Exception as e:
                     logger.warning(f"Erreur indexation politiques: {e}")
             
@@ -148,7 +157,47 @@ class TERAGSystem:
             
         except Exception as e:
             logger.error(f"Erreur indexation politiques: {e}")
-    
+
+    def _search_vector_rules(self, query: str, filters: Dict = None) -> List[Dict]:
+        """Recherche vectorielle dans les règles"""
+        rules = []
+        
+        try:
+            # Construire les filtres ChromaDB
+            where_clause = {}
+            if filters:
+                if filters.get("currency"):
+                    where_clause["currency"] = filters["currency"]
+                if filters.get("country"):
+                    where_clause["country"] = filters["country"]
+            
+            # Recherche vectorielle avec notre embedding connector
+            if self.embedding_connector:
+                query_embedding = self.embedding_connector.generate_embeddings(query)
+                
+                results = self.rules_collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=5,
+                    where=where_clause if where_clause else None
+                )
+                
+                # Convertir les résultats
+                for metadata in results["metadatas"][0]:
+                    rules.append({
+                        "sheet_name": metadata.get("sheet_name"),
+                        "currency": metadata.get("currency"),
+                        "country": metadata.get("country"),
+                        "type": metadata.get("type"),
+                        "amount_limit": metadata.get("amount_limit")
+                    })
+            else:
+                logger.warning("EMBEDDINGConnector non disponible pour la recherche vectorielle")
+        
+        except Exception as e:
+            logger.warning(f"Erreur recherche vectorielle: {e}")
+        
+        return rules            
+
     def search_relevant_rules(self, query: str, filters: Dict = None) -> List[Dict]:
         """Recherche les règles pertinentes pour une requête"""
         try:
@@ -300,41 +349,6 @@ class TERAGSystem:
                    (expense_type and parts[2] == expense_type):
                     if rule not in rules:
                         rules.append(rule)
-        
-        return rules
-    
-    def _search_vector_rules(self, query: str, filters: Dict = None) -> List[Dict]:
-        """Recherche vectorielle dans les règles"""
-        rules = []
-        
-        try:
-            # Construire les filtres ChromaDB
-            where_clause = {}
-            if filters:
-                if filters.get("currency"):
-                    where_clause["currency"] = filters["currency"]
-                if filters.get("country"):
-                    where_clause["country"] = filters["country"]
-            
-            # Recherche vectorielle
-            results = self.rules_collection.query(
-                query_embeddings=[self.model.encode([query]).tolist()[0]],
-                n_results=5,
-                where=where_clause if where_clause else None
-            )
-            
-            # Convertir les résultats
-            for metadata in results["metadatas"][0]:
-                rules.append({
-                    "sheet_name": metadata.get("sheet_name"),
-                    "currency": metadata.get("currency"),
-                    "country": metadata.get("country"),
-                    "type": metadata.get("type"),
-                    "amount_limit": metadata.get("amount_limit")
-                })
-        
-        except Exception as e:
-            logger.warning(f"Erreur recherche vectorielle: {e}")
         
         return rules
     
