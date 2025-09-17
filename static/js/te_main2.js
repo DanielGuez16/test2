@@ -1229,17 +1229,235 @@ async function refreshDocuments() {
 }
 
 function showRulesModal(rules) {
-    // Créer un modal pour afficher les règles Excel sous forme de tableau
-    console.log('Excel Rules:', rules);
-    alert('Excel rules loaded - implement table display in modal');
+    // Créer le contenu HTML du modal
+    let modalContent = `
+        <div class="modal fade" id="rulesModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-table me-2"></i>
+                            T&E Rules (Excel)
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${generateRulesTableHTML(rules)}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Supprimer le modal existant s'il y en a un
+    const existingModal = document.getElementById('rulesModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Ajouter le nouveau modal au DOM
+    document.body.insertAdjacentHTML('beforeend', modalContent);
+    
+    // Afficher le modal
+    const modal = new bootstrap.Modal(document.getElementById('rulesModal'));
+    modal.show();
 }
 
 function showPoliciesModal(policies) {
-    // Créer un modal pour afficher les politiques Word
-    console.log('Word Policies:', policies);
-    alert('Word policies loaded - implement text display in modal');
+    // Créer le contenu HTML du modal
+    let modalContent = `
+        <div class="modal fade" id="policiesModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-file-word me-2"></i>
+                            T&E Policies (Word)
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${generatePoliciesHTML(policies)}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Supprimer le modal existant s'il y en a un
+    const existingModal = document.getElementById('policiesModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Ajouter le nouveau modal au DOM
+    document.body.insertAdjacentHTML('beforeend', modalContent);
+    
+    // Afficher le modal
+    const modal = new bootstrap.Modal(document.getElementById('policiesModal'));
+    modal.show();
 }
 
+function generateRulesTableHTML(rules) {
+    let html = '<div class="accordion" id="rulesAccordion">';
+    
+    Object.entries(rules).forEach(([sheetName, sheetRules], sheetIndex) => {
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading${sheetIndex}">
+                    <button class="accordion-button ${sheetIndex > 0 ? 'collapsed' : ''}" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#collapse${sheetIndex}">
+                        <strong>${sheetName}</strong>
+                        <span class="badge bg-primary ms-2">${sheetRules.length} rules</span>
+                    </button>
+                </h2>
+                <div id="collapse${sheetIndex}" class="accordion-collapse collapse ${sheetIndex === 0 ? 'show' : ''}" 
+                     data-bs-parent="#rulesAccordion">
+                    <div class="accordion-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Currency</th>
+                                        <th>Country</th>
+                                        <th>Limit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+        `;
+        
+        sheetRules.forEach(rule => {
+            html += `
+                <tr>
+                    <td><span class="badge bg-secondary">${rule.type || rule.TYPE || 'N/A'}</span></td>
+                    <td><strong>${rule.currency || rule.CRN_KEY || 'N/A'}</strong></td>
+                    <td>${rule.country || rule.ID_01 || 'N/A'}</td>
+                    <td class="text-end">
+                        <strong>${rule.amount_limit || rule.AMOUNT1 || 0}</strong>
+                        ${rule.currency || rule.CRN_KEY || ''}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    // Ajouter un résumé en haut
+    const totalRules = Object.values(rules).reduce((sum, sheetRules) => sum + sheetRules.length, 0);
+    const currencies = [...new Set(Object.values(rules).flat().map(rule => rule.currency || rule.CRN_KEY))];
+    const countries = [...new Set(Object.values(rules).flat().map(rule => rule.country || rule.ID_01))];
+    
+    const summaryHTML = `
+        <div class="alert alert-info mb-3">
+            <div class="row">
+                <div class="col-md-4 text-center">
+                    <h5 class="mb-1">${totalRules}</h5>
+                    <small>Total Rules</small>
+                </div>
+                <div class="col-md-4 text-center">
+                    <h5 class="mb-1">${currencies.length}</h5>
+                    <small>Currencies</small>
+                </div>
+                <div class="col-md-4 text-center">
+                    <h5 class="mb-1">${countries.length}</h5>
+                    <small>Countries</small>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return summaryHTML + html;
+}
+
+function generatePoliciesHTML(policies) {
+    // Diviser le texte en paragraphes
+    const paragraphs = policies.split('\n\n').filter(p => p.trim().length > 0);
+    
+    let html = `
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Document contains <strong>${paragraphs.length} sections</strong> 
+            (${policies.length} characters total)
+        </div>
+        
+        <div class="mb-3">
+            <input type="text" class="form-control" id="policySearch" 
+                   placeholder="Search in policies..." 
+                   onkeyup="filterPolicies()">
+        </div>
+        
+        <div id="policiesContent" style="max-height: 500px; overflow-y: auto;">
+    `;
+    
+    paragraphs.forEach((paragraph, index) => {
+        // Détecter le type de section
+        const isTitle = paragraph.length < 100 && (
+            paragraph.includes(':') || 
+            paragraph.toUpperCase() === paragraph ||
+            /^\d+\./.test(paragraph)
+        );
+        
+        if (isTitle) {
+            html += `
+                <h6 class="text-primary mt-3 mb-2 policy-section" data-index="${index}">
+                    <i class="fas fa-bookmark me-1"></i>
+                    ${escapeHtml(paragraph)}
+                </h6>
+            `;
+        } else {
+            html += `
+                <p class="policy-paragraph" data-index="${index}">
+                    ${escapeHtml(paragraph).replace(/\n/g, '<br>')}
+                </p>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    
+    // Ajouter la fonction de recherche
+    html += `
+        <script>
+        function filterPolicies() {
+            const searchTerm = document.getElementById('policySearch').value.toLowerCase();
+            const sections = document.querySelectorAll('.policy-section, .policy-paragraph');
+            
+            sections.forEach(section => {
+                const text = section.textContent.toLowerCase();
+                if (text.includes(searchTerm) || searchTerm === '') {
+                    section.style.display = '';
+                    if (searchTerm !== '') {
+                        section.style.backgroundColor = '#fff3cd';
+                    } else {
+                        section.style.backgroundColor = '';
+                    }
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+        </script>
+    `;
+    
+    return html;
+}
 
 // Debug: Log des événements pour diagnostiquer les problèmes
 function debugEventListeners() {

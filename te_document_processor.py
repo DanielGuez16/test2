@@ -446,11 +446,70 @@ class TEDocumentProcessor:
         return index
     
     def process_excel_rules_from_dict(self, excel_dict: dict, filename: str) -> Dict[str, List[Dict]]:
-        """Traite les règles Excel depuis un dictionnaire"""
-        # Adapter votre logique existante pour traiter excel_dict au lieu de file_content
-        # Retourner le même format que process_excel_rules()
-        
+        """Traite les règles Excel depuis un dictionnaire (depuis SharePoint)"""
+        try:
+            logger.info(f"Traitement du dictionnaire Excel: {filename}")
+            
+            rules_data = {}
+            
+            # Traiter chaque feuille du dictionnaire
+            for sheet_name, df in excel_dict.items():
+                logger.info(f"Traitement de la feuille: {sheet_name}")
+                
+                try:
+                    # Convertir en DataFrame si ce n'est pas déjà fait
+                    if not isinstance(df, pd.DataFrame):
+                        df = pd.DataFrame(df)
+                    
+                    # Nettoyer et traiter les données
+                    sheet_rules = self._process_excel_sheet(df, sheet_name)
+                    
+                    if sheet_rules:
+                        rules_data[sheet_name] = sheet_rules
+                        logger.info(f"Feuille {sheet_name}: {len(sheet_rules)} règles extraites")
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur traitement feuille {sheet_name}: {e}")
+                    continue
+            
+            logger.info(f"Traitement Excel terminé: {len(rules_data)} feuilles traitées")
+            return rules_data
+            
+        except Exception as e:
+            logger.error(f"Erreur traitement dictionnaire Excel {filename}: {e}")
+            raise Exception(f"Impossible de traiter le dictionnaire Excel: {str(e)}")
+
     def process_word_policies_from_text(self, text: str, filename: str) -> str:
-        """Traite les politiques Word depuis du texte"""
-        # Retourner directement le texte ou appliquer un nettoyage si nécessaire
-        return text
+        """Traite les politiques Word depuis du texte (depuis SharePoint)"""
+        try:
+            logger.info(f"Traitement du texte Word: {filename} ({len(text)} caractères)")
+            
+            if not text or not text.strip():
+                logger.warning(f"Texte vide pour le fichier {filename}")
+                return f"Document Word '{filename}' chargé mais texte vide."
+            
+            # Nettoyer le texte
+            cleaned_text = self._clean_word_text(text)
+            
+            logger.info(f"Texte Word traité: {len(cleaned_text)} caractères finaux")
+            return cleaned_text
+            
+        except Exception as e:
+            logger.error(f"Erreur traitement texte Word {filename}: {e}")
+            return f"Erreur lors du traitement du texte Word '{filename}': {str(e)}"
+
+    def _clean_word_text(self, text: str) -> str:
+        """Nettoie le texte extrait d'un document Word"""
+        # Supprimer les caractères de contrôle et nettoyer
+        import re
+        
+        # Remplacer les retours à la ligne multiples
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        
+        # Supprimer les espaces en début/fin de lignes
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        # Rejoindre les lignes
+        cleaned_text = '\n'.join(lines)
+        
+        return cleaned_text
