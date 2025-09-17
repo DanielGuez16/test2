@@ -410,6 +410,7 @@ async function analyzeTicket() {
         
     } catch (error) {
         console.error('Erreur analyse:', error);
+        alert('Error during analysis: ' + error.message);
     }
 }
 
@@ -1414,24 +1415,13 @@ function setupDragAndDrop() {
 }
 
 function handleMultipleTicketUpload(files) {
-    const supportedExtensions = [
-        'pdf', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'webp',
-        'doc', 'docx', 'txt', 'csv', 'xlsx', 'xls', 'rtf'
-    ];
-    
-    const validFiles = Array.from(files).filter(file => {
-        const extension = file.name.split('.').pop().toLowerCase();
-        return supportedExtensions.includes(extension);
-    });
-    
-    if (validFiles.length !== files.length) {
-        const invalidCount = files.length - validFiles.length;
-        alert(`${invalidCount} fichier(s) ignoré(s) - types non supportés`);
+    // Si plusieurs fichiers déposés, ne prendre que le premier
+    if (files && files.length > 0) {
+        if (files.length > 1) {
+            alert(`Seul le premier fichier sera traité (${files[0].name})`);
+        }
+        handleTicketUpload(files[0]);
     }
-    
-    selectedFiles = validFiles;
-    displaySelectedFiles();
-    document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
 }
 
 function displaySelectedFiles() {

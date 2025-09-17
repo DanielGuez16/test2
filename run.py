@@ -180,13 +180,14 @@ async def root(request: Request):
         })
     
     log_activity(current_user["username"], "ACCESS", "Accessed T&E Chatbot main page")
-    
+
     return templates.TemplateResponse("te_index.html", {
         "request": request,
         "title": "T&E Analysis Chatbot",
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
         "user": current_user,
+        "te_documents": te_documents,  # Ajouter cette ligne pour le template
         "documents_loaded": bool(te_documents["excel_rules"]),
         "last_loaded": te_documents["last_loaded"]
     })
@@ -476,46 +477,6 @@ async def get_te_status():
         "excel_rules_count": len(te_documents["excel_rules"]) if te_documents["excel_rules"] else 0,
         "word_policies_available": bool(te_documents["word_policies"]),
         "timestamp": datetime.now().isoformat()
-    }
-
-@app.post("/api/analyze-multiple-tickets")
-async def analyze_multiple_tickets(
-    request: Request,
-    session_token: Optional[str] = Cookie(None)
-):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    form = await request.form()
-    files = form.getlist("files")
-    question = form.get("question", "")
-    
-    results = []
-    
-    for file in files:
-        if hasattr(file, 'read'):  # Vérifier que c'est un fichier
-            try:
-                file_content = await file.read()
-                ticket_info = extract_ticket_information(file_content, file.filename)
-                analysis_result = analyze_against_te_rules(ticket_info, te_documents["excel_rules"])
-                
-                results.append({
-                    "filename": file.filename,
-                    "ticket_info": ticket_info,
-                    "analysis_result": analysis_result
-                })
-                
-            except Exception as e:
-                results.append({
-                    "filename": file.filename,
-                    "error": str(e)
-                })
-    
-    return {
-        "success": True,
-        "results": results,
-        "total_files": len(files)
     }
 
 @app.get("/api/view-excel")

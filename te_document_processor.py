@@ -91,24 +91,20 @@ class TEDocumentProcessor:
             return []
     
     def _process_standard_sheet(self, df: pd.DataFrame, sheet_name: str) -> List[Dict]:
-        """
-        Traite les sheets 'Internal staff Meal' et 'Hotel'
-        Structure: CRN_KEY, TYPE, ID_01, AMOUNT1
-        """
         rules = []
         
         for index, row in df.iterrows():
             try:
                 rule = {
                     'sheet_name': sheet_name,
-                    'CRN_KEY': str(row.get('CRN_KEY', '')).strip().upper(),
-                    'ID_01': str(row.get('ID_01', '')).strip().upper(),
-                    'TYPE': str(row.get('TYPE', '')).strip(),
-                    'AMOUNT1': self._extract_numeric_value(row.get('AMOUNT1', 0))
+                    'currency': str(row.get('CRN_KEY', '')).strip().upper(),  # Mapping correct
+                    'country': str(row.get('ID_01', '')).strip().upper(),      # Mapping correct  
+                    'type': str(row.get('TYPE', '')).strip(),
+                    'amount_limit': self._extract_numeric_value(row.get('AMOUNT1', 0))
                 }
                 
-                # Validation des données essentielles
-                if rule['CRN_KEY'] and rule['ID_01'] and rule['AMOUNT1'] > 0:
+                # Validation
+                if rule['currency'] and rule['country'] and rule['amount_limit'] > 0:
                     rules.append(rule)
                 else:
                     logger.debug(f"Ligne {index} ignorée dans {sheet_name}: données incomplètes")
