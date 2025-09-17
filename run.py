@@ -8,7 +8,8 @@ Application FastAPI pour analyser automatiquement les tickets T&E
 contre les politiques internes et fournir des recommandations.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, Cookie
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, Cookie, APIRouter
+from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -1525,6 +1526,82 @@ async def startup_event():
     """Événements au démarrage de l'application"""
     logger.info("🚀 Démarrage T&E Chatbot - Chargement des documents...")
     await load_te_documents_from_sharepoint()
+
+preview = APIRouter()
+
+class ExcelPreviewResponse(BaseModel):
+    sheets: dict  # {sheet_name: {"columns": [..], "rows": [ {...}, ... ]}}
+
+@preview.get("/preview/docx")
+def preview_docx(path: str):
+    """
+    Retourne le texte brut du DOCX (limité pour l'affichage).
+    Query param: path (SharePoint path)
+    """
+    client = SharePointClient()  # adapte si tu instancies ailleurs
+    binary = client.read_binary_file(path)
+    text = client.read_docx_file_as_text(binary) or ""
+    # limite à ~50k chars pour éviter d'exploser l'UI
+    return {"text": text[:50000]}
+
+@preview.get("/preview/excel", response_model=ExcelPreviewResponse)
+def preview_excel(path: str, limit: int = 100):
+    """
+    Retourne un aperçu JSON de l'Excel (colonnes + premières lignes par feuille).
+    Query params: path, limit (lignes par feuille)
+    """
+    import pandas as pd
+    client = SharePointClient()
+    binary = client.read_binary_file(path)
+    data = client.read_excel_file_as_dict(binary)  # selon ton contrat: {sheet: list[dict]} ou dict columns->list
+
+    sheets_json = {}
+
+    # Normalisation robuste
+    def to_df(x):
+        import pandas as pd
+        if isinstance(x, pd.DataFrame):
+            return x
+        if isinstance(x, list):
+            return pd.DataFrame(x)
+        if isinstance(x, dict):
+            # dict colonnes->list
+            return pd.DataFrame(x)
+        return pd.DataFrame()
+
+    if isinstance(data, dict):
+        # soit {sheet_name: ...}, soit colonnes->list pour feuille unique
+        looks_like_sheet_map = any(isinstance(v, (list, dict)) for v in data.values())
+        if looks_like_sheet_map:
+            for sheet, payload in data.items():
+                df = to_df(payload)
+                if not df.empty:
+                    df = df.astype(str).fillna("")
+                    sheets_json[str(sheet)] = {
+                        "columns": list(df.columns),
+                        "rows": df.head(limit).to_dict(orient="records"),
+                    }
+        else:
+            # feuille unique sans nom
+            df = to_df(data).astype(str).fillna("")
+            sheets_json["Sheet1"] = {
+                "columns": list(df.columns),
+                "rows": df.head(limit).to_dict(orient="records"),
+            }
+    elif isinstance(data, list):
+        # liste de lignes -> feuille unique
+        import pandas as pd
+        df = pd.DataFrame(data).astype(str).fillna("")
+        sheets_json["Sheet1"] = {
+            "columns": list(df.columns),
+            "rows": df.head(limit).to_dict(orient="records"),
+        }
+    else:
+        sheets_json["Sheet1"] = {"columns": [], "rows": []}
+
+    return {"sheets": sheets_json}
+
+app.include_router(preview, prefix="/api")
 
 if __name__ == "__main__":
     print("🚀 T&E Chatbot - APAC Region")

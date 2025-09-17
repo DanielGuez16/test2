@@ -1452,6 +1452,125 @@ function removeFile(index) {
     document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
 }
 
+// ---- Preview helpers ----
+const el = (id) => document.getElementById(id);
+const show = (node) => node.classList.remove("hidden");
+const hide = (node) => node.classList.add("hidden");
+
+function openPreview(title){
+  el("preview-title").textContent = title || "Prévisualisation";
+  show(el("preview-panel"));
+}
+function closePreview(){
+  hide(el("preview-panel"));
+}
+function activateTab(tabId){
+  ["tab-docx","tab-excel"].forEach(id => el(id).classList.remove("active"));
+  el(tabId).classList.add("active");
+  if(tabId === "tab-docx"){
+    show(el("docx-view")); hide(el("excel-view"));
+  } else {
+    hide(el("docx-view")); show(el("excel-view"));
+  }
+}
+
+// Render DOCX text
+async function previewDocx(path){
+  const r = await fetch(`/api/preview/docx?path=${encodeURIComponent(path)}`);
+  if(!r.ok){ throw new Error("Erreur preview DOCX"); }
+  const data = await r.json();
+  el("docx-text").textContent = data.text || "(document vide)";
+}
+
+// Render Excel sheets
+async function previewExcel(path){
+  const r = await fetch(`/api/preview/excel?path=${encodeURIComponent(path)}&limit=200`);
+  if(!r.ok){ throw new Error("Erreur preview Excel"); }
+  const data = await r.json();
+  const sheets = data.sheets || {};
+  const sheetSelect = el("sheet-select");
+  sheetSelect.innerHTML = "";
+
+  const names = Object.keys(sheets);
+  if(names.length === 0){
+    el("excel-table").innerHTML = "<tbody><tr><td>Aucune donnée</td></tr></tbody>";
+    return;
+  }
+  names.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    sheetSelect.appendChild(opt);
+  });
+
+  function renderSheet(name){
+    const payload = sheets[name] || {columns:[], rows:[]};
+    const cols = payload.columns || [];
+    const rows = payload.rows || [];
+    const table = el("excel-table");
+    let thead = "<thead><tr>";
+    cols.forEach(c => thead += `<th style="position:sticky;top:0;background:#fafafa;">${escapeHtml(c)}</th>`);
+    thead += "</tr></thead>";
+    let tbody = "<tbody>";
+    rows.forEach(row => {
+      tbody += "<tr>";
+      cols.forEach(c => tbody += `<td>${escapeHtml(row[c] ?? "")}</td>`);
+      tbody += "</tr>";
+    });
+    tbody += "</tbody>";
+    table.innerHTML = thead + tbody;
+  }
+
+  renderSheet(names[0]);
+  sheetSelect.onchange = () => renderSheet(sheetSelect.value);
+}
+
+// Small HTML escaper for safe rendering
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+
+// ---- Wire UI ----
+(function initPreviewUI(){
+  const btnDocx = el("btn-preview-docx");
+  const btnExcel = el("btn-preview-excel");
+  const closeBtn = el("preview-close");
+  const tabDocx = el("tab-docx");
+  const tabExcel = el("tab-excel");
+
+  if(closeBtn) closeBtn.addEventListener("click", closePreview);
+
+  if(tabDocx) tabDocx.addEventListener("click", () => activateTab("tab-docx"));
+  if(tabExcel) tabExcel.addEventListener("click", () => activateTab("tab-excel"));
+
+  if(btnDocx){
+    btnDocx.addEventListener("click", async () => {
+      const path = el("docx-path").value.trim();
+      if(!path) return alert("Renseigne le chemin DOCX (SharePoint).");
+      openPreview("Règles (DOCX)");
+      activateTab("tab-docx");
+      el("docx-text").textContent = "Chargement…";
+      try { await previewDocx(path); } catch(e){ el("docx-text").textContent = "Erreur de chargement."; console.error(e); }
+    });
+  }
+
+  if(btnExcel){
+    btnExcel.addEventListener("click", async () => {
+      const path = el("excel-path").value.trim();
+      if(!path) return alert("Renseigne le chemin Excel (SharePoint).");
+      openPreview("Barèmes (Excel)");
+      activateTab("tab-excel");
+      el("excel-table").innerHTML = "<tbody><tr><td>Chargement…</td></tr></tbody>";
+      try { await previewExcel(path); } catch(e){ el("excel-table").innerHTML = "<tbody><tr><td>Erreur de chargement.</td></tr></tbody>"; console.error(e); }
+    });
+  }
+})();
+
+
 // Initialiser au chargement
 document.addEventListener('DOMContentLoaded', function() {
     setupDragAndDrop();
