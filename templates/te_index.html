@@ -138,7 +138,142 @@
                 </div>
             </div>
 
-            <!-- Ici suit le chatbot, upload ticket, historique... (inchangé) -->
+            <div class="row">
+                <!-- Section principale - Chatbot -->
+                <div class="col-lg-8">
+                    <div class="chatbot-section">
+                        <div class="chat-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h4 class="mb-0">
+                                    <i class="fas fa-robot me-2"></i>
+                                    T&E Assistant
+                                </h4>
+                                <div>
+                                    <button class="btn btn-outline-light btn-sm me-2" onclick="showHistory()">
+                                        <i class="fas fa-history"></i> History
+                                    </button>
+                                    <button class="btn btn-outline-light btn-sm" onclick="clearChat()">
+                                        <i class="fas fa-trash"></i> Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-0">
+                            <!-- Zone de chat -->
+                            <div class="col-md-8">
+                                <div id="chat-container" class="chat-container">
+                                    <div class="chat-message assistant">
+                                        <strong>T&E Assistant:</strong>
+                                        <p>Hello! I'm your T&E analysis assistant for the APAC region.</p>
+                                        <!-- ... reste du message d'accueil ... -->
+                                    </div>
+                                </div>
+
+                                <div class="chat-input-area">
+                                    <div class="d-flex gap-2">
+                                        <input type="text" id="chat-input" class="form-control chat-input" 
+                                            placeholder="Ask about T&E policies or upload a ticket..." 
+                                            onkeypress="handleChatKeyPress(event)">
+                                        <button class="btn btn-chat text-white" onclick="sendMessage()">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Zone d'upload tickets -->
+                            <div class="col-md-4">
+                                <div class="p-3 h-100" style="background: #f8f9fa; border-left: 1px solid #e0e6ed;">
+                                    <h6 class="mb-3">Upload Ticket</h6>
+                                    
+                                    <div class="ticket-upload-area mb-3" id="ticket-upload-area" 
+                                        onclick="document.getElementById('ticket-upload').click()">
+                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--natixis-light-blue);"></i>
+                                        <p class="mb-0">Drop tickets here or click to upload</p>
+                                        <small class="text-muted">PDF, Images, Word, Excel, Text files</small>
+                                    </div>
+                                    
+                                    <input type="file" id="ticket-upload" 
+                                        accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.doc,.docx,.txt,.csv,.xlsx,.xls,.rtf" 
+                                        style="display:none" 
+                                        onchange="handleTicketUpload(this.files[0])">
+                                        
+                                    <div class="mb-3">
+                                        <label for="question-input" class="form-label">Question about this ticket:</label>
+                                        <textarea id="question-input" class="form-control" rows="3" 
+                                            placeholder="Is this expense valid? What's the limit for this category?"></textarea>
+                                    </div>
+                                    
+                                    <button class="btn btn-success w-100" onclick="analyzeTicket()" disabled id="analyze-btn">
+                                        <i class="fas fa-search me-2"></i>
+                                        Analyze Ticket
+                                    </button>
+                                    
+                                    <div id="ticket-status" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar - Historique et infos -->
+                <div class="col-lg-4">
+                    <!-- Historique récent -->
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-clock me-2"></i>
+                                Recent Analysis
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="recent-history" style="max-height: 300px; overflow-y: auto;">
+                                <div class="p-3 text-muted text-center">
+                                    <i class="fas fa-inbox"></i>
+                                    <p class="mb-0">No recent analysis</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guide rapide -->
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Quick Guide
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6>Supported Categories:</h6>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <span class="badge bg-primary">Hotels</span>
+                                    <span class="badge bg-primary">Meals</span>
+                                    <span class="badge bg-primary">Transport</span>
+                                    <span class="badge bg-primary">Flights</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>APAC Currencies:</h6>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <span class="badge bg-secondary">AUD</span>
+                                    <span class="badge bg-secondary">JPY</span>
+                                    <span class="badge bg-secondary">SGD</span>
+                                    <span class="badge bg-secondary">HKD</span>
+                                    <span class="badge bg-secondary">USD</span>
+                                </div>
+                            </div>
+                            
+                            <small class="text-muted">
+                                <strong>Tip:</strong> Upload clear, readable tickets for best analysis results.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>
@@ -175,6 +310,152 @@
             </div>
         </div>
     </div>
+
+    
+
+
+
+
+
+
+
+    <div class="modal fade" id="feedbackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Feedback on Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Rate this analysis:</label>
+                    <div class="rating-stars" id="rating-stars">
+                        <i class="fas fa-star star" data-rating="1"></i>
+                        <i class="fas fa-star star" data-rating="2"></i>
+                        <i class="fas fa-star star" data-rating="3"></i>
+                        <i class="fas fa-star star" data-rating="4"></i>
+                        <i class="fas fa-star star" data-rating="5"></i>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="issue-type" class="form-label">Issue Type (if any):</label>
+                    <select class="form-select" id="issue-type">
+                        <option value="">No issue</option>
+                        <option value="incorrect_validation">Incorrect validation</option>
+                        <option value="missing_rules">Missing rules</option>
+                        <option value="wrong_limit">Wrong limit applied</option>
+                        <option value="ocr_error">OCR reading error</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="feedback-comment" class="form-label">Additional Comments:</label>
+                    <textarea class="form-control" id="feedback-comment" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="documentUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Load T&E Documents</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="upload-area" onclick="document.getElementById('excel-file').click()">
+                            <i class="fas fa-file-excel"></i>
+                            <h5>Excel Rules File</h5>
+                            <p class="text-muted">Upload the Excel file with T&E rules<br>(Internal staff Meal, Hotel, etc.)</p>
+                        </div>
+                        <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none">
+                        <div id="excel-status" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="upload-area" onclick="document.getElementById('word-file').click()">
+                            <i class="fas fa-file-word"></i>
+                            <h5>Word Policies File</h5>
+                            <p class="text-muted">Upload the Word document with T&E policies and procedures</p>
+                        </div>
+                        <input type="file" id="word-file" accept=".docx,.doc" style="display:none">
+                        <div id="word-status" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadTEDocuments()" disabled id="upload-documents-btn">
+                    <i class="fas fa-upload me-2"></i>
+                    Load Documents
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Analysis History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="full-history">
+                    <div class="text-center">
+                        <div class="spinner-custom"></div>
+                        <p class="mt-2">Loading history...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% if user.role == 'admin' %}
+<div class="modal fade" id="adminModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Administration Panel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#logs-tab">Activity Logs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#users-tab">Users</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#feedback-tab">Feedback</a>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane active" id="logs-tab">
+                        <div id="admin-logs">Loading logs...</div>
+                    </div>
+                    <div class="tab-pane" id="users-tab">
+                        <div id="admin-users">Loading users...</div>
+                    </div>
+                    <div class="tab-pane" id="feedback-tab">
+                        <div id="admin-feedback">Loading feedback...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
