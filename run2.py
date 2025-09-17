@@ -204,58 +204,7 @@ async def logout(request: Request):
     response = JSONResponse({"success": True, "redirect": "/"})
     response.delete_cookie("session_token")
     return response
-
-@app.post("/api/load-te-documents")
-async def load_te_documents(
-    excel_file: UploadFile = File(...),
-    word_file: UploadFile = File(...),
-    session_token: Optional[str] = Cookie(None)
-):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        log_activity(current_user["username"], "DOCUMENT_LOAD", f"Loading T&E documents: {excel_file.filename}, {word_file.filename}")
-        
-        # Lire les fichiers
-        excel_content = await excel_file.read()
-        word_content = await word_file.read()
-        
-        # Traiter les documents
-        excel_rules = te_processor.process_excel_rules(excel_content, excel_file.filename)
-        word_policies = te_processor.process_word_policies(word_content, word_file.filename)
-        
-        # Stocker en mémoire globale
-        te_documents["excel_rules"] = excel_rules
-        te_documents["word_policies"] = word_policies
-        te_documents["last_loaded"] = datetime.now().isoformat()
-        
-        # NOUVEAU: Indexer dans le système RAG
-        logger.info("Indexation des documents dans le système RAG...")
-        rag_system.index_excel_rules(excel_rules)
-        rag_system.index_word_policies(word_policies)
-        
-        # Obtenir les stats RAG
-        rag_stats = rag_system.get_stats()
-        logger.info(f"RAG indexé: {rag_stats}")
-        
-        total_rules = sum(len(rules) for rules in excel_rules.values())
-        
-        return {
-            "success": True,
-            "message": "T&E documents loaded and indexed successfully",
-            "excel_rules_count": len(excel_rules),
-            "total_rules": total_rules,
-            "word_policies_length": len(word_policies),
-            "rag_stats": rag_stats,
-            "loaded_at": te_documents["last_loaded"]
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur chargement documents T&E: {e}")
-        raise HTTPException(status_code=500, detail=f"Error loading T&E documents: {str(e)}")
-    
+ 
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
     ticket_file: UploadFile = File(...),
@@ -518,7 +467,7 @@ async def refresh_te_documents(session_token: Optional[str] = Cookie(None)):
     else:
         raise HTTPException(status_code=500, detail="Error refreshing documents from SharePoint")
     
-    
+
 #######################################################################################################################################
 #                           UTILITY FUNCTIONS
 #######################################################################################################################################
