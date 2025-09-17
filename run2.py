@@ -366,13 +366,18 @@ async def get_analysis_history(session_token: Optional[str] = Cookie(None)):
 
 @app.get("/api/te-status")
 async def get_te_status():
-    """Vérifie le statut des documents T&E"""
+    excel_count = 0
+    if te_documents.get("excel_rules"):
+        excel_count = sum(len(rules) for rules in te_documents["excel_rules"].values())
+    
     return {
-        "documents_loaded": bool(te_documents["excel_rules"]),
-        "last_loaded": te_documents["last_loaded"],
-        "excel_rules_count": len(te_documents["excel_rules"]) if te_documents["excel_rules"] else 0,
-        "word_policies_available": bool(te_documents["word_policies"]),
-        "timestamp": datetime.now().isoformat()
+        "documents_loaded": bool(te_documents.get("excel_rules")),
+        "last_loaded": te_documents.get("last_loaded"),
+        "excel_rules_count": excel_count,
+        "word_policies_available": bool(te_documents.get("word_policies")),
+        "word_policies_length": len(te_documents.get("word_policies", "")),
+        "timestamp": datetime.now().isoformat(),
+        "debug_keys": list(te_documents.keys())  # Pour debug
     }
 
 @app.post("/api/analyze-multiple-tickets")
@@ -421,8 +426,7 @@ async def view_excel_rules(session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    if not te_documents["excel_rules"]:
+    if not te_documents.get("excel_rules"):  
         raise HTTPException(status_code=404, detail="No Excel rules loaded")
     
     return {
@@ -438,7 +442,7 @@ async def view_word_policies(session_token: Optional[str] = Cookie(None)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    if not te_documents["word_policies"]:
+    if not te_documents.get("word_policies"):
         raise HTTPException(status_code=404, detail="No Word policies loaded")
     
     return {
@@ -498,10 +502,15 @@ def load_te_documents_from_sharepoint():
         
         # Stocker globalement
         te_documents["excel_rules"] = excel_rules
-        te_documents["word_policies"] = word_policies
+        te_documents["word_policies"] = docx_text  # Stocker le texte brut, pas l'objet processé
         te_documents["last_loaded"] = datetime.now().isoformat()
         te_documents["source"] = "SharePoint"
         
+        # Debug logs
+        logger.info(f"Excel rules keys: {list(excel_rules.keys()) if excel_rules else 'None'}")
+        logger.info(f"Word policies length: {len(docx_text) if docx_text else 0} characters")
+        logger.info(f"te_documents keys: {list(te_documents.keys())}")
+
         # Indexer dans le système RAG
         logger.info("Indexation dans le système RAG...")
         rag_system.index_excel_rules(excel_rules)
