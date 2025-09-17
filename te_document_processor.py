@@ -444,3 +444,13 @@ class TEDocumentProcessor:
                 key = f"{rule['currency']}_{rule['country']}_{rule['type']}"
                 index[key] = rule
         return index
+    
+    def process_excel_rules_from_dict(self, excel_dict: dict, filename: str) -> Dict[str, List[Dict]]:
+        """Traite les règles Excel depuis un dictionnaire"""
+        # Adapter votre logique existante pour traiter excel_dict au lieu de file_content
+        # Retourner le même format que process_excel_rules()
+        
+    def process_word_policies_from_text(self, text: str, filename: str) -> str:
+        """Traite les politiques Word depuis du texte"""
+        # Retourner directement le texte ou appliquer un nettoyage si nécessaire
+        return text
