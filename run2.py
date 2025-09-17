@@ -44,6 +44,8 @@ from rag_system import TERAGSystem
 rag_system = TERAGSystem()
 
 from sharepoint_connector import SharePointClient
+from context_builder import TEContextBuilder
+from ticket_analyzer import TicketAnalyzer
 
 # Imports internes
 from llm_connector import LLMConnector
@@ -393,14 +395,15 @@ async def analyze_multiple_tickets(
     files = form.getlist("files")
     question = form.get("question", "")
     
+    analyzer = TicketAnalyzer(rag_system, llm_connector)
     results = []
     
     for file in files:
-        if hasattr(file, 'read'):  # Vérifier que c'est un fichier
+        if hasattr(file, 'read'):
             try:
                 file_content = await file.read()
                 ticket_info = extract_ticket_information(file_content, file.filename)
-                analysis_result = analyze_against_te_rules(ticket_info, te_documents["excel_rules"])
+                analysis_result = analyzer.analyze_ticket(ticket_info, question)
                 
                 results.append({
                     "filename": file.filename,

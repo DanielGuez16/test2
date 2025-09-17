@@ -1066,6 +1066,8 @@ function setupDragAndDrop() {
 }
 
 function handleMultipleTicketUpload(files) {
+    if (!files || files.length === 0) return;
+    
     const supportedExtensions = [
         'pdf', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'webp',
         'doc', 'docx', 'txt', 'csv', 'xlsx', 'xls', 'rtf'
@@ -1108,43 +1110,6 @@ function displaySelectedFiles() {
     container.innerHTML = html;
 }
 
-function removeFile(index) {
-    selectedFiles.splice(index, 1);
-    displaySelectedFiles();
-    document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
-}
-
-// Initialiser au chargement
-document.addEventListener('DOMContentLoaded', function() {
-    setupDragAndDrop();
-});
-
-// ===== FONCTIONS GLOBALES POUR LES ONCLICK =====
-
-// Ces fonctions sont exposées globalement pour les onclick dans le HTML
-window.showDocumentUpload = showDocumentUpload;
-window.showAdminPanel = showAdminPanel;
-window.showHistory = showHistory;
-window.showFeedbackModal = showFeedbackModal;
-window.submitFeedback = submitFeedback;
-window.uploadTEDocuments = uploadTEDocuments;
-window.logout = logout;
-window.clearChat = clearChat;
-window.sendMessage = sendMessage;
-window.analyzeTicket = analyzeTicket;
-
-// ===== GESTION D'ERREURS =====
-
-window.addEventListener('error', function(event) {
-    console.error('JavaScript Error:', event.error);
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled Promise Rejection:', event.reason);
-});
-
-// ===== FONCTIONS UTILITAIRES SUPPLÉMENTAIRES =====
-
 // Améliorer la gestion des erreurs réseau
 async function makeAPICall(url, options = {}) {
     try {
@@ -1159,28 +1124,10 @@ async function makeAPICall(url, options = {}) {
     }
 }
 
-// Fonction manquante pour gérer la sélection de fichier ticket
 function handleTicketFileSelect() {
     const fileInput = document.getElementById('ticket-upload');
     if (fileInput && fileInput.files && fileInput.files[0]) {
         handleTicketUpload(fileInput.files[0]);
-    }
-}
-
-async function viewExcelRules() {
-    try {
-        const response = await fetch('/api/view-excel-rules');
-        const result = await response.json();
-        
-        if (result.success) {
-            // Afficher dans un modal ou nouvelle page
-            showRulesModal(result.rules);
-        } else {
-            alert('No Excel rules loaded');
-        }
-    } catch (error) {
-        console.error('Error viewing Excel rules:', error);
-        alert('Error loading Excel rules');
     }
 }
 
@@ -1458,6 +1405,47 @@ function generatePoliciesHTML(policies) {
     
     return html;
 }
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    displaySelectedFiles();
+    document.getElementById('analyze-btn').disabled = selectedFiles.length === 0;
+}
+
+// Initialiser au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    setupDragAndDrop();
+});
+
+// ===== FONCTIONS GLOBALES POUR LES ONCLICK =====
+
+// Ces fonctions sont exposées globalement pour les onclick dans le HTML
+window.showDocumentUpload = showDocumentUpload;
+window.showAdminPanel = showAdminPanel;
+window.showHistory = showHistory;
+window.showFeedbackModal = showFeedbackModal;
+window.submitFeedback = submitFeedback;
+window.uploadTEDocuments = uploadTEDocuments;
+window.logout = logout;
+window.clearChat = clearChat;
+window.sendMessage = sendMessage;
+window.analyzeTicket = analyzeTicket;
+window.makeAPICall = makeAPICall;
+window.handleTicketFileSelect = handleTicketFileSelect;
+window.showRulesModal = showRulesModal;
+window.removeFile = removeFile;
+window.viewWordPolicies = viewWordPolicies;
+window.refreshDocuments = refreshDocuments;
+
+// ===== GESTION D'ERREURS =====
+
+window.addEventListener('error', function(event) {
+    console.error('JavaScript Error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled Promise Rejection:', event.reason);
+});
 
 // Debug: Log des événements pour diagnostiquer les problèmes
 function debugEventListeners() {
