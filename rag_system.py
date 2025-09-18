@@ -240,8 +240,11 @@ class TERAGSystem:
             # Recherche vectorielle si disponible
             if self.embedding_connector and self.policies_collection:
                 try:
+                    # CORRECTION : Utiliser embedding_connector au lieu de self.model
+                    query_embedding = self.embedding_connector.generate_embeddings(topic)
+                    
                     results = self.policies_collection.query(
-                        query_embeddings=[self.model.encode([topic]).tolist()[0]],
+                        query_embeddings=[query_embedding],
                         n_results=3
                     )
                     relevant_sections.extend(results["documents"][0])

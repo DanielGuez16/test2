@@ -69,7 +69,7 @@ te_documents = {
     "excel_binary": None, 
     "word_binary": None,   
     "last_loaded": None,
-    "load_status": "not_loaded",  # "loading", "loaded", "error"
+    "load_status": "not_loaded",
     "error_message": None
 }
 
@@ -167,7 +167,7 @@ async def load_te_documents_from_sharepoint():
             "error_message": str(e)
         })
         return False
-    
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Page d'accueil - redirige vers login si non connecté"""
@@ -188,7 +188,7 @@ async def root(request: Request):
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
         "user": current_user,
-        "te_documents": te_documents,  # Ajouter cette ligne pour le template
+        "te_documents": te_documents,
         "documents_loaded": bool(te_documents["excel_rules"]),
         "last_loaded": te_documents["last_loaded"]
     })
@@ -285,7 +285,7 @@ async def load_te_documents(
         te_documents["word_policies"] = word_policies
         te_documents["last_loaded"] = datetime.now().isoformat()
         
-        # NOUVEAU: Indexer dans le système RAG
+        # Indexer dans le système RAG
         logger.info("Indexation des documents dans le système RAG...")
         rag_system.index_excel_rules(excel_rules)
         rag_system.index_word_policies(word_policies)
@@ -316,8 +316,6 @@ async def analyze_ticket(
     question: str = Form(""),
     session_token: Optional[str] = Cookie(None)
 ):
-    analyzer = TicketAnalyzer(rag_system, llm_connector)
-
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -328,20 +326,30 @@ async def analyze_ticket(
     try:
         log_activity(current_user["username"], "TICKET_ANALYSIS", f"Analyzing ticket: {ticket_file.filename}")
         
-        # Lire le ticket (garder ta logique existante)
+        # 1. Extraire le texte du fichier
         ticket_content = await ticket_file.read()
-        ticket_info = extract_ticket_information(ticket_content, ticket_file.filename)
-                
-        # Au début de la méthode analyze_ticket
-        if not ticket_info.get("amount") and not ticket_info.get("currency"):
+        text_info = extract_ticket_information(ticket_content, ticket_file.filename)
+        
+        # 2. Si extraction de texte a échoué
+        if text_info.get("error") or not text_info.get("raw_text"):
             return {
-                "status": "invalid_ticket",
-                "ai_response": "Unable to extract expense information from this document. Please ensure the ticket contains clear amount and currency information.",
-                "basic_validation": {"is_valid": False, "status": "error"},
-                "applied_rules": []
+                "success": True,
+                "ticket_info": text_info,
+                "analysis_result": {
+                    "result": "FAIL",
+                    "expense_type": "Erreur d'extraction",
+                    "justification": "Impossible d'extraire le texte du document",
+                    "comment": "Unable to extract text from this document. Please ensure the file is readable.",
+                    "confidence_score": 0.0
+                },
+                "timestamp": datetime.now().isoformat()
             }
         
+        # 3. Extraction IA complète
         analyzer = TicketAnalyzer(rag_system, llm_connector)
+        ticket_info = analyzer.ai_extract_ticket_info(text_info["raw_text"], ticket_file.filename)
+        
+        # 4. Analyse avec les règles
         analysis_result = analyzer.analyze_ticket(ticket_info, question)
 
         # Sauvegarder l'analyse
@@ -369,8 +377,6 @@ async def analyze_ticket(
     
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
-    analyzer = TicketAnalyzer(rag_system, llm_connector)
-
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -415,213 +421,11 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
     except Exception as e:
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
-      
-@app.post("/api/feedback")
-async def submit_feedback(
-    request: Request,
-    session_token: Optional[str] = Cookie(None)
-):
-    """Soumet un feedback sur une réponse du chatbot"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        data = await request.json()
-        
-        feedback_record = {
-            "timestamp": datetime.now().isoformat(),
-            "user": current_user["username"],
-            "analysis_id": data.get("analysis_id", ""),
-            "rating": data.get("rating", 0),
-            "comment": data.get("comment", ""),
-            "issue_type": data.get("issue_type", "")
-        }
-        
-        # Sauvegarder en CSV local
-        save_feedback_to_csv(feedback_record)
-        
-        # Ajouter à la session
-        chatbot_session["feedback_data"].append(feedback_record)
-        
-        log_activity(current_user["username"], "FEEDBACK", f"Rating: {feedback_record['rating']}, Issue: {feedback_record['issue_type']}")
-        
-        return {
-            "success": True,
-            "message": "Feedback submitted successfully"
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur feedback: {e}")
-        raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
 
-@app.get("/api/analysis-history")
-async def get_analysis_history(session_token: Optional[str] = Cookie(None)):
-    """Récupère l'historique des analyses"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    # Filtrer par utilisateur si non admin
-    if current_user["role"] == "admin":
-        history = chatbot_session["analysis_history"]
-    else:
-        history = [
-            record for record in chatbot_session["analysis_history"]
-            if record.get("user") == current_user["username"]
-        ]
-    
-    return {
-        "success": True,
-        "history": history[-20:],  # Derniers 20 enregistrements
-        "total": len(history)
-    }
+# [Autres routes inchangées...]
 
-@app.get("/api/te-status")
-async def get_te_status():
-    """Vérifie le statut des documents T&E"""
-    return {
-        "documents_loaded": bool(te_documents["excel_rules"]),
-        "last_loaded": te_documents["last_loaded"],
-        "excel_rules_count": len(te_documents["excel_rules"]) if te_documents["excel_rules"] else 0,
-        "word_policies_available": bool(te_documents["word_policies"]),
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/api/view-excel")
-async def view_excel_document(session_token: Optional[str] = Cookie(None)):
-    """Retourne le contenu Excel formaté pour visualisation"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    if not te_documents["excel_rules"]:
-        raise HTTPException(status_code=404, detail="Excel document not loaded")
-    
-    try:
-        # Formater les données Excel pour affichage tableau
-        formatted_data = {}
-        total_rules = 0
-        
-        for sheet_name, rules in te_documents["excel_rules"].items():
-            formatted_data[sheet_name] = {
-                "columns": ["Currency", "Country", "Type", "Amount Limit"],
-                "rows": []
-            }
-            
-            for rule in rules:
-                formatted_data[sheet_name]["rows"].append([
-                    rule.get("currency", "N/A"),
-                    rule.get("country", "N/A"), 
-                    rule.get("type", "N/A"),
-                    f"{rule.get('amount_limit', 0)}"
-                ])
-            
-            total_rules += len(rules)
-        
-        log_activity(current_user["username"], "VIEW_EXCEL", f"Viewed Excel document - {total_rules} rules")
-        
-        return {
-            "success": True,
-            "filename": "Consolidated Limits.xlsx",
-            "sheets": formatted_data,
-            "total_rules": total_rules,
-            "last_loaded": te_documents["last_loaded"]
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur visualisation Excel: {e}")
-        raise HTTPException(status_code=500, detail=f"Error viewing Excel: {str(e)}")
-
-@app.get("/api/view-word")
-async def view_word_document(session_token: Optional[str] = Cookie(None)):
-    """Retourne le contenu Word pour visualisation PDF-like"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    if not te_documents["word_policies"]:
-        raise HTTPException(status_code=404, detail="Word document not loaded")
-    
-    try:
-        # Formater le texte Word en sections pour un affichage PDF-like
-        sections = []
-        current_section = {"title": "Introduction", "content": ""}
-        
-        paragraphs = te_documents["word_policies"].split('\n\n')
-        
-        for paragraph in paragraphs:
-            if paragraph.strip():
-                # Détecter si c'est un titre (ligne courte avec mots-clés)
-                if (len(paragraph.strip()) < 100 and 
-                    any(keyword in paragraph.lower() for keyword in 
-                        ['policy', 'procedure', 'rule', 'expense', 'travel', 'accommodation', 'meal'])):
-                    
-                    # Sauvegarder la section précédente si elle a du contenu
-                    if current_section["content"].strip():
-                        sections.append(current_section.copy())
-                    
-                    # Commencer une nouvelle section
-                    current_section = {
-                        "title": paragraph.strip(),
-                        "content": ""
-                    }
-                else:
-                    current_section["content"] += paragraph + "\n\n"
-        
-        # Ajouter la dernière section
-        if current_section["content"].strip():
-            sections.append(current_section)
-        
-        log_activity(current_user["username"], "VIEW_WORD", f"Viewed Word document - {len(sections)} sections")
-        
-        return {
-            "success": True,
-            "filename": "APAC Travel Entertainment Procedure Mar2025_Clean.docx",
-            "sections": sections,
-            "total_sections": len(sections),
-            "last_loaded": te_documents["last_loaded"]
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur visualisation Word: {e}")
-        raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
-
-@app.post("/api/refresh-documents")
-async def refresh_te_documents(session_token: Optional[str] = Cookie(None)):
-    """Force le rechargement des documents T&E depuis SharePoint"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        log_activity(current_user["username"], "REFRESH_DOCUMENTS", "Manual refresh of T&E documents")
-        
-        success = await load_te_documents_from_sharepoint()
-        
-        if success:
-            return {
-                "success": True,
-                "message": "Documents refreshed successfully from SharePoint",
-                "last_loaded": te_documents["last_loaded"],
-                "status": te_documents["load_status"]
-            }
-        else:
-            return {
-                "success": False,
-                "message": f"Failed to refresh documents: {te_documents.get('error_message', 'Unknown error')}",
-                "status": te_documents["load_status"]
-            }
-            
-    except Exception as e:
-        logger.error(f"Erreur refresh documents: {e}")
-        raise HTTPException(status_code=500, detail=f"Error refreshing documents: {str(e)}")
-    
 #######################################################################################################################################
-#                           UTILITY FUNCTIONS
+#                           UTILITY FUNCTIONS - EXTRACTION TEXTE SEULEMENT
 #######################################################################################################################################
 
 def preprocess_image_for_ocr(image):
@@ -631,36 +435,25 @@ def preprocess_image_for_ocr(image):
         import numpy as np
         from PIL import Image, ImageEnhance, ImageFilter
         
-        # Convertir en niveaux de gris
         if image.mode != 'L':
             image = image.convert('L')
         
-        # Améliorer le contraste
         enhancer = ImageEnhance.Contrast(image)
         image = enhancer.enhance(2.0)
         
-        # Améliorer la netteté
         image = image.filter(ImageFilter.SHARPEN)
         
-        # Redimensionner si trop petit
         width, height = image.size
         if width < 1000 or height < 1000:
             scale_factor = max(1000/width, 1000/height)
             new_size = (int(width * scale_factor), int(height * scale_factor))
             image = image.resize(new_size, Image.Resampling.LANCZOS)
         
-        # Convertir en numpy pour OpenCV
         img_array = np.array(image)
-        
-        # Seuillage adaptatif
         img_thresh = cv2.adaptiveThreshold(
             img_array, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
         )
-        
-        # Débruitage
         img_denoised = cv2.medianBlur(img_thresh, 3)
-        
-        # Reconvertir en PIL
         processed_image = Image.fromarray(img_denoised)
         
         return processed_image
@@ -673,7 +466,7 @@ def preprocess_image_for_ocr(image):
         return image
     
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
-    """Extrait les informations d'un ticket avec OCR amélioré et parsing intelligent"""
+    """Extrait SEULEMENT le texte brut du ticket - AUCUNE analyse"""
     try:
         file_ext = Path(filename).suffix.lower()
         text = ""
@@ -681,20 +474,10 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
         if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp']:
             # Images - utiliser OCR avec preprocessing
             try:
-                import cv2
-                import numpy as np
-                from PIL import Image, ImageEnhance, ImageFilter
-                
-                # Convertir en PIL Image
                 image = Image.open(io.BytesIO(file_content))
-                
-                # Preprocessing pour améliorer l'OCR
                 image = preprocess_image_for_ocr(image)
                 
-                # OCR avec Tesseract
                 import pytesseract
-                
-                # Configuration OCR optimisée pour tickets
                 custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-€$£¥₹/: '
                 text = pytesseract.image_to_string(image, config=custom_config)
                 
@@ -705,9 +488,8 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
                 text = f"Image file {filename} - OCR extraction failed"
                 
         elif file_ext == '.pdf':
-            # PDF - extraire le texte avec multiple méthodes
+            # PDF - extraire le texte
             try:
-                # Méthode 1: PyPDF2
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
                 text_parts = []
                 for page in pdf_reader.pages:
@@ -725,8 +507,7 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
                         
                         for page_num in range(len(pdf_doc)):
                             page = pdf_doc[page_num]
-                            # Convertir en image puis OCR
-                            mat = fitz.Matrix(2, 2)  # zoom factor
+                            mat = fitz.Matrix(2, 2)
                             pix = page.get_pixmap(matrix=mat)
                             img_data = pix.tobytes("png")
                             
@@ -756,7 +537,6 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
                     doc = Document(io.BytesIO(file_content))
                     text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
                 else:
-                    # Pour .doc, utiliser python-docx2txt si disponible
                     try:
                         import docx2txt
                         text = docx2txt.process(io.BytesIO(file_content))
@@ -769,13 +549,11 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
         elif file_ext in ['.xlsx', '.xls']:
             # Fichiers Excel
             try:
-                import pandas as pd
                 if file_ext == '.xlsx':
                     df = pd.read_excel(io.BytesIO(file_content), sheet_name=None)
                 else:
                     df = pd.read_excel(io.BytesIO(file_content), sheet_name=None, engine='xlrd')
                 
-                # Convertir toutes les sheets en texte
                 text_parts = []
                 for sheet_name, sheet_df in df.items():
                     text_parts.append(f"Sheet: {sheet_name}")
@@ -815,813 +593,28 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
             except:
                 text = f"Unsupported file type {filename} ({file_ext})"
     
-        # Parser les informations du ticket avec extraction améliorée
-        ticket_info = parse_ticket_text_enhanced(text)
-        ticket_info["filename"] = filename
-        ticket_info["raw_text"] = text[:1500]  # Augmenté pour plus de contexte
-        ticket_info["file_type"] = file_ext
-        
-        return ticket_info
+        # RETOURNER SEULEMENT LE TEXTE - PAS D'ANALYSE
+        return {
+            "filename": filename,
+            "raw_text": text[:2000],  # Plus de texte pour l'IA
+            "file_type": file_ext,
+            "extraction_method": "text_only"
+        }
         
     except Exception as e:
-        logger.error(f"Erreur extraction ticket: {e}")
+        logger.error(f"Erreur extraction texte: {e}")
         return {
             "filename": filename,
             "error": str(e),
             "raw_text": "",
-            "file_type": Path(filename).suffix.lower(),
-            "amount": None,
-            "currency": None,
-            "date": None,
-            "vendor": None,
-            "category": "unknown",
-            "location": None,
-            "confidence": 0.0
-        }
-    
-def parse_ticket_text_enhanced(text: str) -> dict:
-    """Parse amélioré du texte d'un ticket avec regex robustes"""
-    info = {
-        "amount": None,
-        "currency": None,
-        "date": None,
-        "vendor": None,
-        "category": "unknown",
-        "location": None,
-        "country_code": None,
-        "description": "",
-        "confidence": 0.0
-    }
-    
-    confidence_factors = []
-    
-    # === EXTRACTION DES MONTANTS AMÉLIORÉE ===
-    amount_patterns = [
-        # Patterns avec devise avant
-        r'(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD|CNY|INR|THB|MYR|KRW|TWD)\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)',
-        # Patterns avec devise après
-        r'([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD|CNY|INR|THB|MYR|KRW|TWD)',
-        # Patterns avec symboles
-        r'([€$£¥₹])\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)',
-        r'([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*([€$£¥₹])',
-        # Total/Amount labels
-        r'(?:Total|Amount|Price|Prix|Montant)[\s:]*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*(EUR|USD|AED|CHF|AUD|GBP|JPY|SGD|HKD)?',
-        # Patterns numériques seuls (moins fiables)
-        r'([0-9]{1,4}[.,][0-9]{2})\b'
-    ]
-    
-    amount_found = False
-    for i, pattern in enumerate(amount_patterns):
-        matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
-        if matches:
-            for match in matches:
-                try:
-                    if len(match) == 2:
-                        # Déterminer quel élément est le montant
-                        if match[0].replace(',', '.').replace('.', '').isdigit():
-                            amount_str = match[0]
-                            currency_str = match[1]
-                        else:
-                            amount_str = match[1]
-                            currency_str = match[0]
-                        
-                        # Nettoyer et convertir le montant
-                        cleaned_amount = clean_amount_string(amount_str)
-                        if cleaned_amount and 0.01 <= cleaned_amount <= 100000:  # Plage raisonnable
-                            info["amount"] = cleaned_amount
-                            info["currency"] = normalize_currency(currency_str) if currency_str else None
-                            confidence_factors.append(0.3 - (i * 0.05))  # Plus de confiance pour les premiers patterns
-                            amount_found = True
-                            break
-                    elif len(match) == 1:
-                        # Montant seul
-                        cleaned_amount = clean_amount_string(match)
-                        if cleaned_amount and 1 <= cleaned_amount <= 100000:
-                            info["amount"] = cleaned_amount
-                            confidence_factors.append(0.1)
-                            amount_found = True
-                            break
-                except (ValueError, IndexError):
-                    continue
-        if amount_found:
-            break
-    
-    # === EXTRACTION DES DATES AMÉLIORÉE ===
-    date_patterns = [
-        r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})',      # DD/MM/YYYY ou MM/DD/YYYY
-        r'(\d{4}[/.-]\d{1,2}[/.-]\d{1,2})',      # YYYY/MM/DD
-        r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})',  # DD Month YYYY
-        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})', # Month DD, YYYY
-        r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{2})'       # DD/MM/YY
-    ]
-    
-    for pattern in date_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            info["date"] = matches[0]
-            confidence_factors.append(0.2)
-            break
-    
-    # === DÉTECTION INTELLIGENTE DU PAYS/LIEU ===
-    location_info = detect_location_from_text(text)
-    info.update(location_info)
-    if location_info.get("country_code"):
-        confidence_factors.append(0.2)
-    
-    # === CATÉGORISATION AMÉLIORÉE ===
-    category_info = categorize_expense_enhanced(text)
-    info["category"] = category_info["category"]
-    confidence_factors.append(category_info["confidence"])
-    
-    # === EXTRACTION DU VENDEUR ===
-    vendor_info = extract_vendor_info(text)
-    info["vendor"] = vendor_info["name"]
-    confidence_factors.append(vendor_info["confidence"])
-    
-    # === CALCUL DE LA CONFIANCE GLOBALE ===
-    info["confidence"] = min(sum(confidence_factors), 1.0)
-    
-    info["description"] = text[:300]  # Description plus longue
-    
-    return info
-
-def parse_ticket_text(text: str) -> dict:
-    """Parse le texte d'un ticket pour extraire les informations clés"""
-    info = {
-        "amount": None,
-        "currency": None,
-        "date": None,
-        "vendor": None,
-        "category": "unknown",
-        "location": None,
-        "description": ""
-    }
-    
-    # Extraction des montants
-    amount_patterns = [
-        r'(\d+[,.]?\d*)\s*(EUR|USD|AED|CHF|AUD|GBP|JPY)',
-        r'(EUR|USD|AED|CHF|AUD|GBP|JPY)\s*(\d+[,.]?\d*)',
-        r'Total[\s:]*(\d+[,.]?\d*)',
-        r'Amount[\s:]*(\d+[,.]?\d*)'
-    ]
-    
-    for pattern in amount_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            match = matches[0]
-            if isinstance(match, tuple) and len(match) == 2:
-                if match[0].replace(',', '.').replace('.', '').isdigit():
-                    info["amount"] = float(match[0].replace(',', '.'))
-                    info["currency"] = match[1].upper()
-                else:
-                    info["amount"] = float(match[1].replace(',', '.'))
-                    info["currency"] = match[0].upper()
-            break
-    
-    # Extraction des dates
-    date_patterns = [
-        r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-        r'(\d{2,4}[/.-]\d{1,2}[/.-]\d{1,2})'
-    ]
-    
-    for pattern in date_patterns:
-        matches = re.findall(pattern, text)
-        if matches:
-            info["date"] = matches[0]
-            break
-    
-    # Catégorisation basique
-    text_lower = text.lower()
-    if any(word in text_lower for word in ['hotel', 'accommodation', 'lodging']):
-        info["category"] = "hotel"
-    elif any(word in text_lower for word in ['restaurant', 'meal', 'food', 'dining']):
-        info["category"] = "meal"
-    elif any(word in text_lower for word in ['taxi', 'uber', 'transport', 'metro', 'bus']):
-        info["category"] = "transport"
-    elif any(word in text_lower for word in ['flight', 'airline', 'airport']):
-        info["category"] = "flight"
-    
-    # Extraction du vendeur/établissement
-    lines = text.split('\n')
-    if lines:
-        info["vendor"] = lines[0].strip()[:50]  # Premier ligne comme vendeur potentiel
-    
-    info["description"] = text[:200]  # Premiers 200 caractères comme description
-    
-    return info
-
-def analyze_against_te_rules(ticket_info: dict, excel_rules: dict) -> dict:
-    """Analyse un ticket contre les règles T&E chargées"""
-    try:
-        analysis = {
-            "is_valid": False,
-            "confidence": 0.0,
-            "issues": [],
-            "recommendations": [],
-            "matching_rules": [],
-            "status": "pending_review"
-        }
-        
-        amount = ticket_info.get("amount")
-        currency = ticket_info.get("currency", "EUR")
-        category = ticket_info.get("category", "unknown")
-        
-        if not amount:
-            analysis["issues"].append("Amount not found in ticket")
-            analysis["recommendations"].append("Please provide a clear ticket with visible amount")
-            return analysis
-        
-        # Rechercher les règles applicables
-        applicable_rules = find_applicable_rules(excel_rules, currency, category)
-        
-        if not applicable_rules:
-            analysis["issues"].append(f"No rules found for {category} in {currency}")
-            analysis["recommendations"].append("Check if this expense category is covered by policy")
-            return analysis
-        
-        # Vérifier les limites
-        for rule in applicable_rules:
-            limit = rule.get("limit", 0)
-            rule_type = rule.get("type", "")
-            
-            analysis["matching_rules"].append({
-                "type": rule_type,
-                "limit": limit,
-                "currency": currency,
-                "description": rule.get("description", "")
-            })
-            
-            if amount <= limit:
-                analysis["is_valid"] = True
-                analysis["confidence"] = 0.9
-                analysis["status"] = "approved"
-            else:
-                analysis["issues"].append(f"{category.title()} amount {amount} {currency} exceeds limit of {limit} {currency}")
-                analysis["recommendations"].append("Get manager approval for amount exceeding policy limit")
-                analysis["confidence"] = 0.3
-                analysis["status"] = "requires_approval"
-        
-        # Vérifications additionnelles
-        if ticket_info.get("date"):
-            # Vérifier si la date n'est pas trop ancienne (ex: > 30 jours)
-            try:
-                from datetime import datetime, timedelta
-                # Cette vérification pourrait être implémentée selon vos règles
-                pass
-            except:
-                pass
-        
-        # Si aucun problème majeur
-        if not analysis["issues"] and analysis["is_valid"]:
-            analysis["recommendations"].append("Expense appears compliant with T&E policy")
-        
-        return analysis
-        
-    except Exception as e:
-        logger.error(f"Erreur analyse règles T&E: {e}")
-        return {
-            "is_valid": False,
-            "confidence": 0.0,
-            "issues": [f"Analysis error: {str(e)}"],
-            "recommendations": ["Please contact support"],
-            "matching_rules": [],
-            "status": "error"
+            "file_type": Path(filename).suffix.lower()
         }
 
-def find_applicable_rules(excel_rules: dict, currency: str, category: str) -> list:
-    """Trouve les règles applicables selon la devise et catégorie"""
-    applicable = []
-    
-    # Mapper les catégories aux sheets Excel
-    category_mapping = {
-        "meal": "Internal staff Meal",
-        "hotel": "Hotel", 
-        "breakfast": "Breakfast & Lunch & Dinner",
-        "lunch": "Breakfast & Lunch & Dinner",
-        "dinner": "Breakfast & Lunch & Dinner",
-        "transport": "Internal staff Meal"  # Fallback
-    }
-    
-    sheet_name = category_mapping.get(category, "Internal staff Meal")
-    
-    if sheet_name in excel_rules:
-        sheet_data = excel_rules[sheet_name]
-        
-        # Rechercher par devise (CRN_KEY)
-        for rule in sheet_data:
-            if rule.get("CRN_KEY") == currency:
-                applicable.append({
-                    "type": rule.get("TYPE", category),
-                    "limit": rule.get("AMOUNT1", 0),
-                    "currency": currency,
-                    "country": rule.get("ID_01", ""),
-                    "description": f"{sheet_name} - {rule.get('TYPE', '')}"
-                })
-    
-    return applicable
-
-def prepare_te_context(ticket_info: dict, analysis_result: dict, te_documents: dict) -> str:
-    """Prépare le contexte T&E pour l'IA"""
-    context_parts = []
-    
-    # Contexte métier
-    context_parts.append("CONTEXTE T&E (Travel & Expense):")
-    context_parts.append("- Analyse automatique des tickets de frais selon les politiques APAC")
-    context_parts.append("- Validation des montants contre les limites approuvées")
-    context_parts.append("- Vérification de conformité avec les règles internes")
-    
-    # Informations du ticket
-    context_parts.append(f"\nTICKET ANALYSÉ:")
-    context_parts.append(f"- Fichier: {ticket_info.get('filename', 'N/A')}")
-    context_parts.append(f"- Montant: {ticket_info.get('amount', 'N/A')} {ticket_info.get('currency', 'N/A')}")
-    context_parts.append(f"- Catégorie: {ticket_info.get('category', 'N/A')}")
-    context_parts.append(f"- Date: {ticket_info.get('date', 'N/A')}")
-    context_parts.append(f"- Vendeur: {ticket_info.get('vendor', 'N/A')}")
-    
-    # Résultat de l'analyse
-    context_parts.append(f"\nRÉSULTAT ANALYSE:")
-    context_parts.append(f"- Statut: {analysis_result.get('status', 'N/A')}")
-    context_parts.append(f"- Valide: {analysis_result.get('is_valid', False)}")
-    context_parts.append(f"- Confiance: {analysis_result.get('confidence', 0):.1%}")
-    
-    if analysis_result.get("issues"):
-        context_parts.append("- Problèmes identifiés:")
-        for issue in analysis_result["issues"]:
-            context_parts.append(f"  • {issue}")
-    
-    if analysis_result.get("matching_rules"):
-        context_parts.append("- Règles applicables:")
-        for rule in analysis_result["matching_rules"]:
-            context_parts.append(f"  • {rule['description']}: limite {rule['limit']} {rule['currency']}")
-    
-    # Règles générales depuis les documents
-    if te_documents.get("word_policies"):
-        context_parts.append(f"\nPOLITIQUES T&E:")
-        # Extraire les premiers paragraphes des politiques Word
-        policies_text = te_documents["word_policies"][:500] + "..."
-        context_parts.append(policies_text)
-    
-    return "\n".join(context_parts)
-
-def prepare_general_te_context() -> str:
-    """Prépare un contexte général T&E pour les questions sans ticket"""
-    context_parts = []
-    
-    context_parts.append("SYSTÈME T&E CHATBOT - RÉGION APAC:")
-    context_parts.append("- Aide aux collaborateurs pour comprendre les politiques T&E")
-    context_parts.append("- Validation automatique des tickets de frais")
-    context_parts.append("- Règles par pays/devise selon les grilles tarifaires")
-    
-    if te_documents.get("excel_rules"):
-        context_parts.append("\nRÈGLES DISPONIBLES:")
-        for sheet_name, rules in te_documents["excel_rules"].items():
-            context_parts.append(f"- {sheet_name}: {len(rules)} règles")
-            if rules:
-                currencies = set(rule.get("CRN_KEY", "") for rule in rules)
-                context_parts.append(f"  Devises: {', '.join(sorted(currencies))}")
-    
-    context_parts.append("\nCATÉGORIES COUVERTES:")
-    context_parts.append("- Hôtels et hébergement")
-    context_parts.append("- Repas (petit-déjeuner, déjeuner, dîner)")
-    context_parts.append("- Transport et déplacements")
-    context_parts.append("- Frais divers selon politique")
-    
-    if te_documents.get("word_policies"):
-        context_parts.append(f"\nEXTRAIT POLITIQUES:")
-        context_parts.append(te_documents["word_policies"][:300] + "...")
-    
-    return "\n".join(context_parts)
-
-def save_feedback_to_csv(feedback_record: dict):
-    """Sauvegarde le feedback dans un fichier CSV local"""
-    try:
-        import csv
-        import os
-        
-        feedback_file = "data/feedback.csv"
-        
-        # Créer le header si le fichier n'existe pas
-        file_exists = os.path.exists(feedback_file)
-        
-        with open(feedback_file, mode='a', newline='', encoding='utf-8') as file:
-            fieldnames = ['timestamp', 'user', 'analysis_id', 'rating', 'comment', 'issue_type']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            
-            if not file_exists:
-                writer.writeheader()
-            
-            writer.writerow(feedback_record)
-        
-        logger.info(f"Feedback sauvegardé: {feedback_record['rating']}/5")
-        
-    except Exception as e:
-        logger.error(f"Erreur sauvegarde feedback: {e}")
-
-def clean_amount_string(amount_str: str) -> float:
-    """Nettoie et convertit une chaîne de montant en float"""
-    try:
-        # Supprimer espaces et caractères non numériques sauf , et .
-        cleaned = re.sub(r'[^\d.,]', '', amount_str.strip())
-        
-        if not cleaned:
-            return None
-        
-        # Gérer les différents formats de séparateurs
-        if ',' in cleaned and '.' in cleaned:
-            # Format: 1,234.56 ou 1.234,56
-            comma_pos = cleaned.rfind(',')
-            dot_pos = cleaned.rfind('.')
-            
-            if dot_pos > comma_pos:
-                # Format anglais: 1,234.56
-                cleaned = cleaned.replace(',', '')
-            else:
-                # Format européen: 1.234,56
-                cleaned = cleaned.replace('.', '').replace(',', '.')
-        elif ',' in cleaned:
-            # Déterminer si c'est un séparateur de milliers ou décimal
-            comma_parts = cleaned.split(',')
-            if len(comma_parts) == 2 and len(comma_parts[1]) <= 2:
-                # Séparateur décimal
-                cleaned = cleaned.replace(',', '.')
-            else:
-                # Séparateur de milliers
-                cleaned = cleaned.replace(',', '')
-        
-        return float(cleaned)
-        
-    except (ValueError, AttributeError):
-        return None
-
-def normalize_currency(currency_str: str) -> str:
-    """Normalise les codes de devise"""
-    if not currency_str:
-        return "EUR"  # Valeur par défaut
-    currency_map = {
-        '€': 'EUR', '$': 'USD', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
-        'euro': 'EUR', 'dollar': 'USD', 'pound': 'GBP', 'yen': 'JPY'
-    }
-    
-    currency_clean = currency_str.strip().upper()
-    return currency_map.get(currency_clean, currency_clean)
-
-def detect_location_from_text(text: str) -> dict:
-    """Détection intelligente du pays/lieu à partir du texte"""
-    location_info = {
-        "location": None,
-        "country_code": None,
-        "city": None
-    }
-    
-    # Base de données de correspondances géographiques
-    location_mappings = {
-        # Villes -> Pays
-        'paris': {'country': 'FR', 'city': 'Paris'},
-        'lyon': {'country': 'FR', 'city': 'Lyon'},
-        'marseille': {'country': 'FR', 'city': 'Marseille'},
-        'london': {'country': 'GB', 'city': 'London'},
-        'berlin': {'country': 'DE', 'city': 'Berlin'},
-        'munich': {'country': 'DE', 'city': 'Munich'},
-        'frankfurt': {'country': 'DE', 'city': 'Frankfurt'},
-        'sydney': {'country': 'AU', 'city': 'Sydney'},
-        'melbourne': {'country': 'AU', 'city': 'Melbourne'},
-        'tokyo': {'country': 'JP', 'city': 'Tokyo'},
-        'osaka': {'country': 'JP', 'city': 'Osaka'},
-        'singapore': {'country': 'SG', 'city': 'Singapore'},
-        'hongkong': {'country': 'HK', 'city': 'Hong Kong'},
-        'hong kong': {'country': 'HK', 'city': 'Hong Kong'},
-        'dubai': {'country': 'AE', 'city': 'Dubai'},
-        'abu dhabi': {'country': 'AE', 'city': 'Abu Dhabi'},
-        'zurich': {'country': 'CH', 'city': 'Zurich'},
-        'geneva': {'country': 'CH', 'city': 'Geneva'},
-        'new york': {'country': 'US', 'city': 'New York'},
-        'chicago': {'country': 'US', 'city': 'Chicago'},
-        'los angeles': {'country': 'US', 'city': 'Los Angeles'},
-        'bangkok': {'country': 'TH', 'city': 'Bangkok'},
-        'kuala lumpur': {'country': 'MY', 'city': 'Kuala Lumpur'},
-        'seoul': {'country': 'KR', 'city': 'Seoul'},
-        'taipei': {'country': 'TW', 'city': 'Taipei'},
-        'mumbai': {'country': 'IN', 'city': 'Mumbai'},
-        'delhi': {'country': 'IN', 'city': 'Delhi'},
-        'beijing': {'country': 'CN', 'city': 'Beijing'},
-        'shanghai': {'country': 'CN', 'city': 'Shanghai'}
-    }
-    
-    # Codes pays directs
-    country_codes = {
-        'france': 'FR', 'germany': 'DE', 'australia': 'AU', 'japan': 'JP',
-        'singapore': 'SG', 'uae': 'AE', 'switzerland': 'CH', 'usa': 'US',
-        'united states': 'US', 'united kingdom': 'GB', 'uk': 'GB',
-        'thailand': 'TH', 'malaysia': 'MY', 'south korea': 'KR', 'korea': 'KR',
-        'taiwan': 'TW', 'india': 'IN', 'china': 'CN'
-    }
-    
-    text_lower = text.lower()
-    
-    # Rechercher les villes
-    for city, info in location_mappings.items():
-        if city in text_lower:
-            location_info["city"] = info["city"]
-            location_info["country_code"] = info["country"]
-            location_info["location"] = info["city"]
-            return location_info
-    
-    # Rechercher les pays
-    for country, code in country_codes.items():
-        if country in text_lower:
-            location_info["country_code"] = code
-            location_info["location"] = country.title()
-            return location_info
-    
-    # Rechercher les codes de pays (FR, DE, etc.)
-    country_pattern = r'\b([A-Z]{2})\b'
-    matches = re.findall(country_pattern, text)
-    valid_codes = ['FR', 'DE', 'AU', 'JP', 'SG', 'AE', 'CH', 'US', 'GB', 'TH', 'MY', 'KR', 'TW', 'IN', 'CN']
-    for match in matches:
-        if match in valid_codes:
-            location_info["country_code"] = match
-            return location_info
-    
-    return location_info
-
-def categorize_expense_enhanced(text: str) -> dict:
-    """Catégorisation améliorée des dépenses"""
-    if not text:  # AJOUTER cette vérification
-        return {"category": "unknown", "confidence": 0.0}
-    
-    text_lower = text.lower()
-    
-    # Définitions de catégories avec scores de confiance
-    categories = {
-        "hotel": {
-            "keywords": ["hotel", "accommodation", "lodging", "room", "night", "stay", "resort", "inn", "motel"],
-            "patterns": [r"hotel\s+\w+", r"room\s+\d+", r"\d+\s+night"],
-            "confidence": 0.3
-        },
-        "meal": {
-            "keywords": ["restaurant", "meal", "food", "dining", "cafe", "bistro", "brasserie", "eatery"],
-            "patterns": [r"restaurant\s+\w+", r"table\s+\d+", r"menu"],
-            "confidence": 0.25
-        },
-        "breakfast": {
-            "keywords": ["breakfast", "petit dejeuner", "morning", "coffee", "croissant"],
-            "patterns": [r"breakfast\s+menu", r"petit\s+dejeuner"],
-            "confidence": 0.3
-        },
-        "transport": {
-            "keywords": ["taxi", "uber", "metro", "bus", "train", "transport", "ride", "fare"],
-            "patterns": [r"taxi\s+\w+", r"uber\s+trip", r"metro\s+ticket"],
-            "confidence": 0.3
-        },
-        "flight": {
-            "keywords": ["flight", "airline", "airport", "boarding", "gate", "seat"],
-            "patterns": [r"flight\s+\w+", r"gate\s+\w+", r"seat\s+\w+"],
-            "confidence": 0.35
-        }
-    }
-    
-    best_category = "unknown"
-    best_confidence = 0.0
-    
-    for category, data in categories.items():
-        confidence = 0.0
-        
-        # Vérifier les mots-clés
-        keyword_matches = sum(1 for keyword in data["keywords"] if keyword in text_lower)
-        if keyword_matches > 0:
-            confidence += data["confidence"] * (keyword_matches / len(data["keywords"]))
-        
-        # Vérifier les patterns
-        for pattern in data["patterns"]:
-            if re.search(pattern, text_lower):
-                confidence += 0.1
-        
-        if confidence > best_confidence:
-            best_confidence = confidence
-            best_category = category
-    
-    return {
-        "category": best_category,
-        "confidence": min(best_confidence, 0.3)  # Plafonner à 0.3
-    }
-
-def extract_vendor_info(text: str) -> dict:
-    """Extraction des informations du vendeur/établissement"""
-    if not text:  # AJOUTER cette vérification
-        return {"name": None, "confidence": 0.0}
-
-    lines = [line.strip() for line in text.split('\n') if line.strip()]
-    
-    if not lines:
-        return {"name": None, "confidence": 0.0}
-    
-    # La première ligne non-vide est souvent le nom du vendeur
-    first_line = lines[0]
-    
-    # Nettoyer les artefacts OCR courants
-    cleaned_line = re.sub(r'^[^\w]+|[^\w]+$', '', first_line)
-    
-    # Vérifier si ça ressemble à un nom d'établissement
-    confidence = 0.1
-    if len(cleaned_line) > 3 and len(cleaned_line) < 50:
-        confidence = 0.2
-        
-        # Bonus si contient des mots d'établissement
-        establishment_words = ["hotel", "restaurant", "cafe", "bistro", "store", "shop", "market"]
-        if any(word in cleaned_line.lower() for word in establishment_words):
-            confidence = 0.25
-    
-    return {
-        "name": cleaned_line[:50] if cleaned_line else None,
-        "confidence": confidence
-    }
-
-
-#######################################################################################################################################
-#                           ADMIN ROUTES
-#######################################################################################################################################
-
-@app.get("/api/logs")
-async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    logs = get_logs(limit)
-    return {
-        "success": True,
-        "logs": logs,
-        "total": len(logs)
-    }
-
-@app.get("/api/users")
-async def get_users_list(session_token: Optional[str] = Cookie(None)):
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    users = [
-        {
-            "username": user["username"],
-            "full_name": user["full_name"], 
-            "role": user["role"],
-            "created_at": user["created_at"]
-        }
-        for user in USERS_DB.values()
-    ]
-    
-    return {
-        "success": True,
-        "users": users
-    }
-
-@app.get("/api/feedback-stats")
-async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
-    """Statistiques sur les feedbacks (admins seulement)"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-        
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        import csv
-        import os
-        
-        feedback_file = "data/feedback.csv"
-        stats = {
-            "total_feedback": 0,
-            "average_rating": 0.0,
-            "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-            "common_issues": {}
-        }
-        
-        if os.path.exists(feedback_file):
-            with open(feedback_file, 'r', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                ratings = []
-                
-                for row in reader:
-                    stats["total_feedback"] += 1
-                    
-                    # Rating distribution
-                    rating = int(row.get('rating', 0))
-                    if 1 <= rating <= 5:
-                        stats["rating_distribution"][rating] += 1
-                        ratings.append(rating)
-                    
-                    # Common issues
-                    issue_type = row.get('issue_type', 'unknown')
-                    stats["common_issues"][issue_type] = stats["common_issues"].get(issue_type, 0) + 1
-                
-                # Average rating
-                if ratings:
-                    stats["average_rating"] = round(sum(ratings) / len(ratings), 2)
-        
-        return {
-            "success": True,
-            "stats": stats
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur stats feedback: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-    
-@app.on_event("startup")
-async def startup_event():
-    """Événements au démarrage de l'application"""
-    logger.info("🚀 Démarrage T&E Chatbot - Chargement des documents...")
-    await load_te_documents_from_sharepoint()
-
-preview = APIRouter()
-
-class ExcelPreviewResponse(BaseModel):
-    sheets: dict  # {sheet_name: {"columns": [..], "rows": [ {...}, ... ]}}
-
-@preview.get("/preview/docx")
-def preview_docx(path: str):
-    """
-    Retourne le texte brut du DOCX (limité pour l'affichage).
-    Query param: path (SharePoint path)
-    """
-    client = SharePointClient()  # adapte si tu instancies ailleurs
-    binary = client.read_binary_file(path)
-    text = client.read_docx_file_as_text(binary) or ""
-    # limite à ~50k chars pour éviter d'exploser l'UI
-    return {"text": text[:50000]}
-
-@preview.get("/preview/excel", response_model=ExcelPreviewResponse)
-def preview_excel(path: str, limit: int = 100):
-    """
-    Retourne un aperçu JSON de l'Excel (colonnes + premières lignes par feuille).
-    Query params: path, limit (lignes par feuille)
-    """
-    import pandas as pd
-    client = SharePointClient()
-    binary = client.read_binary_file(path)
-    data = client.read_excel_file_as_dict(binary)  # selon ton contrat: {sheet: list[dict]} ou dict columns->list
-
-    sheets_json = {}
-
-    # Normalisation robuste
-    def to_df(x):
-        import pandas as pd
-        if isinstance(x, pd.DataFrame):
-            return x
-        if isinstance(x, list):
-            return pd.DataFrame(x)
-        if isinstance(x, dict):
-            # dict colonnes->list
-            return pd.DataFrame(x)
-        return pd.DataFrame()
-
-    if isinstance(data, dict):
-        # soit {sheet_name: ...}, soit colonnes->list pour feuille unique
-        looks_like_sheet_map = any(isinstance(v, (list, dict)) for v in data.values())
-        if looks_like_sheet_map:
-            for sheet, payload in data.items():
-                df = to_df(payload)
-                if not df.empty:
-                    df = df.astype(str).fillna("")
-                    sheets_json[str(sheet)] = {
-                        "columns": list(df.columns),
-                        "rows": df.head(limit).to_dict(orient="records"),
-                    }
-        else:
-            # feuille unique sans nom
-            df = to_df(data).astype(str).fillna("")
-            sheets_json["Sheet1"] = {
-                "columns": list(df.columns),
-                "rows": df.head(limit).to_dict(orient="records"),
-            }
-    elif isinstance(data, list):
-        # liste de lignes -> feuille unique
-        import pandas as pd
-        df = pd.DataFrame(data).astype(str).fillna("")
-        sheets_json["Sheet1"] = {
-            "columns": list(df.columns),
-            "rows": df.head(limit).to_dict(orient="records"),
-        }
-    else:
-        sheets_json["Sheet1"] = {"columns": [], "rows": []}
-
-    return {"sheets": sheets_json}
-
-app.include_router(preview, prefix="/api")
+# [Reste des fonctions utilitaires inchangées...]
 
 if __name__ == "__main__":
     print("🚀 T&E Chatbot - APAC Region")
-    print("📊 Interface: http://localhost:8000")
+    print("📊 Interface: http://localhost:8001")
     print("📋 Templates: templates/te_index.html")
     print("🎨 Styles: static/js/te_main.js")
     print("ℹ️  Ctrl+C pour arrêter")

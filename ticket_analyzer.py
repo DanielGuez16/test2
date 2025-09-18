@@ -11,6 +11,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import re
+import json
 
 from context_builder import TEContextBuilder
 from llm_connector import LLMConnector
@@ -24,92 +25,69 @@ class TicketAnalyzer:
         self.rag_system = rag_system
         self.llm_connector = llm_connector
         self.context_builder = TEContextBuilder()
-        
-        # Mappings pour normaliser les données
-        self.country_mappings = {
-            'france': 'FR', 'paris': 'FR', 'lyon': 'FR',
-            'germany': 'DE', 'berlin': 'DE', 'munich': 'DE',
-            'australia': 'AU', 'sydney': 'AU', 'melbourne': 'AU',
-            'united states': 'US', 'usa': 'US', 'new york': 'US',
-            'uae': 'AE', 'dubai': 'AE', 'abu dhabi': 'AE',
-            'switzerland': 'CH', 'zurich': 'CH', 'geneva': 'CH'
-        }
-        
-        self.expense_type_mappings = {
-            'hotel': 'Hotel1',
-            'accommodation': 'Hotel1',
-            'lodging': 'Hotel1',
-            'meal': 'Meal1', 
-            'restaurant': 'Meal1',
-            'food': 'Meal1',
-            'breakfast': 'Breakfast1',
-            'lunch': 'Meal1',
-            'dinner': 'Meal1'
-        }
     
     def analyze_ticket(self, ticket_info: dict, user_question: str = "") -> dict:
         """
         Analyse complète d'un ticket T&E
         
         Args:
-            ticket_info: Informations extraites du ticket
+            ticket_info: Informations extraites du ticket par IA
             user_question: Question spécifique de l'utilisateur
             
         Returns:
-            dict: Résultat complet de l'analyse
+            dict: Résultat complet de l'analyse au format business
         """
         logger.info(f"Début analyse ticket: {ticket_info.get('filename', 'N/A')}")
         
         try:
-            # 1. Normaliser et enrichir les données du ticket
-            normalized_ticket = self._normalize_ticket_data(ticket_info)
+            # 1. Extraire les critères d'analyse
+            analysis_criteria = self._extract_analysis_criteria(ticket_info)
             
-            # 2. Extraire les critères d'analyse
-            analysis_criteria = self._extract_analysis_criteria(normalized_ticket)
-            
-            # 3. Rechercher les règles pertinentes via RAG
+            # 2. Rechercher les règles pertinentes via RAG
             relevant_rules = self._find_relevant_rules(analysis_criteria)
             
-            # 4. Obtenir le contexte des politiques
+            # 3. Obtenir le contexte des politiques
             policies_context = self._get_policies_context(analysis_criteria)
             
-            # 5. Validation basique contre les règles trouvées
-            basic_validation = self._perform_basic_validation(normalized_ticket, relevant_rules)
+            # 4. Validation basique contre les règles trouvées
+            basic_validation = self._perform_basic_validation(ticket_info, relevant_rules)
             
-            # 6. Préparer le contexte pour l'IA
+            # 5. Préparer le contexte pour l'IA
             context = self.context_builder.build_context(
                 'ticket_analysis',
-                ticket_info=normalized_ticket,
+                ticket_info=ticket_info,
                 relevant_rules=relevant_rules,
                 policies_context=policies_context
             )
             
-            # 7. Préparer le prompt utilisateur
-            prompt = self.context_builder.build_prompt_for_ticket_analysis(user_question, normalized_ticket)
+            # 6. Préparer le prompt utilisateur
+            prompt = self.context_builder.build_prompt_for_ticket_analysis(user_question, ticket_info)
             
-            # 8. Obtenir l'analyse IA
+            # 7. Obtenir l'analyse IA
             ai_response = self.llm_connector.get_llm_response(prompt, context)
             
-            # 9. Structurer le résultat final
+            # 8. Structurer le résultat final au FORMAT BUSINESS
             analysis_result = {
-                'ai_response': ai_response,
-                'basic_validation': basic_validation,
-                'applied_rules': relevant_rules,
-                'analysis_criteria': analysis_criteria,
-                'policies_context': policies_context[:200] + "..." if len(policies_context) > 200 else policies_context,
-                'confidence_score': self._calculate_confidence(relevant_rules, normalized_ticket),
-                'recommendations': self._generate_recommendations(normalized_ticket, relevant_rules, basic_validation),
+                'result': 'PASS' if basic_validation['is_valid'] else 'FAIL',
+                'expense_type': self._determine_expense_type(ticket_info, relevant_rules),
+                'justification': self._build_justification(relevant_rules, basic_validation, ticket_info),
+                'comment': ai_response,  # Commentaire IA complet
+                'confidence_score': self._calculate_confidence(relevant_rules, ticket_info),
+                'applied_rules': relevant_rules,  # Pour debug
                 'timestamp': datetime.now().isoformat()
             }
             
-            logger.info(f"Analyse terminée avec succès - Confidence: {analysis_result['confidence_score']}")
+            logger.info(f"Analyse terminée avec succès - Result: {analysis_result['result']}")
             return analysis_result
             
         except Exception as e:
             logger.error(f"Erreur lors de l'analyse du ticket: {str(e)}")
             return {
-                'ai_response': f"Erreur lors de l'analyse: {str(e)}",
-                'basic_validation': {'is_valid': False, 'status': 'error'},
+                'result': 'FAIL',
+                'expense_type': 'Erreur d\'analyse',
+                'justification': f'Erreur technique: {str(e)}',
+                'comment': f"Erreur lors de l'analyse: {str(e)}",
+                'confidence_score': 0.0,
                 'applied_rules': [],
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
@@ -118,13 +96,6 @@ class TicketAnalyzer:
     def answer_general_question(self, user_question: str, te_rules_summary: dict) -> dict:
         """
         Répond à une question générale sur les politiques T&E
-        
-        Args:
-            user_question: Question de l'utilisateur
-            te_rules_summary: Résumé des règles disponibles
-            
-        Returns:
-            dict: Réponse structurée
         """
         try:
             # Obtenir le contexte général
@@ -157,46 +128,36 @@ class TicketAnalyzer:
                 'timestamp': datetime.now().isoformat()
             }
     
-    def _normalize_ticket_data(self, ticket_info: dict) -> dict:
-        """Normalise et enrichit les données du ticket"""
-        normalized = ticket_info.copy()
-        
-        # Normaliser le pays
-        location = ticket_info.get('location', '').lower()
-        vendor = ticket_info.get('vendor', '').lower()
-        description = ticket_info.get('description', '').lower()
-        
-        # Chercher le pays dans différents champs
-        for text in [location, vendor, description]:
-            for location_name, country_code in self.country_mappings.items():
-                if location_name in text:
-                    normalized['country_code'] = country_code
-                    break
-            if 'country_code' in normalized:
-                break
-        
-        # Normaliser le type de dépense
-        category = ticket_info.get('category', '').lower()
-        if category in self.expense_type_mappings:
-            normalized['expense_type'] = self.expense_type_mappings[category]
-        else:
-            normalized['expense_type'] = 'Meal1'  # Défaut
-        
-        # Normaliser la devise
-        currency = ticket_info.get('currency', 'EUR').upper()
-        normalized['currency'] = currency
-        
-        return normalized
-    
     def _extract_analysis_criteria(self, ticket_info: dict) -> dict:
         """Extrait les critères d'analyse du ticket"""
         return {
             'currency': ticket_info.get('currency', 'EUR'),
             'country': ticket_info.get('country_code', 'FR'),
-            'expense_type': ticket_info.get('expense_type', 'Meal1'),
+            'expense_type': self._map_category_to_expense_type(ticket_info.get('category', 'unknown')),
             'amount': ticket_info.get('amount', 0),
             'category': ticket_info.get('category', 'meal')
         }
+    
+    def _map_category_to_expense_type(self, category: str) -> str:
+        """Mappe une catégorie IA vers un type de dépense Excel"""
+        if not category:
+            return 'Meal1'
+        
+        category_lower = category.lower()
+        
+        mapping = {
+            'hotel': 'Hotel1',
+            'accommodation': 'Hotel1',
+            'lodging': 'Hotel1',
+            'meal': 'Meal1',
+            'restaurant': 'Meal1',
+            'food': 'Meal1',
+            'breakfast': 'Breakfast1',
+            'lunch': 'Meal1',
+            'dinner': 'Meal1'
+        }
+        
+        return mapping.get(category_lower, 'Meal1')
     
     def _find_relevant_rules(self, criteria: dict) -> List[Dict]:
         """Trouve les règles pertinentes via le système RAG"""
@@ -206,15 +167,15 @@ class TicketAnalyzer:
                 query = f"{criteria['expense_type']} {criteria['country']} {criteria['currency']}"
                 return self.rag_system.search_relevant_rules(query, filters=criteria)
             else:
-                # Fallback: recherche directe dans les données Excel chargées depuis run.py
+                # Fallback: recherche directe dans les données Excel
                 return self._fallback_rule_search_with_excel_data(criteria)
         except Exception as e:
             logger.warning(f"Erreur recherche règles RAG: {e}, utilisation fallback")
             return self._fallback_rule_search_with_excel_data(criteria)
     
     def _fallback_rule_search_with_excel_data(self, criteria: dict) -> List[Dict]:
-        """Recherche de règles en fallback en accédant aux données Excel depuis run.py"""
-        from run import te_documents  # Import direct depuis run.py
+        """Recherche de règles en fallback"""
+        from run import te_documents
         
         rules = []
         excel_rules = te_documents.get("excel_rules")
@@ -230,7 +191,7 @@ class TicketAnalyzer:
         # Mapper les types de dépenses aux sheets Excel
         sheet_mapping = {
             "Hotel1": "Hotel",
-            "Meal1": "Internal staff Meal", 
+            "Meal1": "Internal staff Meal",
             "Breakfast1": "Breakfast & Lunch & Dinner"
         }
         
@@ -239,7 +200,6 @@ class TicketAnalyzer:
         if expense_type in sheet_mapping:
             target_sheets.append(sheet_mapping[expense_type])
         else:
-            # Chercher dans toutes les sheets
             target_sheets = list(excel_rules.keys())
         
         for sheet_name in target_sheets:
@@ -248,7 +208,6 @@ class TicketAnalyzer:
                 
             sheet_rules = excel_rules[sheet_name]
             for rule in sheet_rules:
-                # Vérifier correspondance avec les critères
                 rule_matches = True
                 
                 if currency and rule.get("currency") != currency:
@@ -257,7 +216,6 @@ class TicketAnalyzer:
                 if country and rule.get("country") != country:
                     rule_matches = False
                 
-                # Pour Breakfast & Lunch & Dinner, être plus flexible sur le type
                 if sheet_name == "Breakfast & Lunch & Dinner":
                     if expense_type == "Meal1" and rule.get("type") not in ["Meal1", "Breakfast1"]:
                         rule_matches = False
@@ -268,7 +226,6 @@ class TicketAnalyzer:
                         rule_matches = False
                 
                 if rule_matches:
-                    # Convertir au format attendu
                     formatted_rule = {
                         "sheet_name": sheet_name,
                         "currency": rule.get("currency"),
@@ -282,14 +239,7 @@ class TicketAnalyzer:
         if not rules:
             for sheet_name, sheet_rules in excel_rules.items():
                 for rule in sheet_rules:
-                    partial_match = False
-                    
                     if currency and rule.get("currency") == currency:
-                        partial_match = True
-                    elif country and rule.get("country") == country:
-                        partial_match = True
-                    
-                    if partial_match:
                         formatted_rule = {
                             "sheet_name": sheet_name,
                             "currency": rule.get("currency"),
@@ -299,40 +249,155 @@ class TicketAnalyzer:
                         }
                         rules.append(formatted_rule)
                         
-                        # Limiter le nombre de résultats partiels
                         if len(rules) >= 5:
                             break
                 if len(rules) >= 5:
                     break
         
         logger.info(f"Fallback search trouvé {len(rules)} règles pour {criteria}")
-        return rules[:10]  # Limiter à 10 résultats
+        return rules[:10]
     
+    def _ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
+        """Extrait TOUTES les informations du ticket via IA + RAG"""
+        try:
+            # Construire le prompt d'extraction
+            extraction_prompt = f"""
+            Analyse ce ticket et extrait les informations suivantes au format JSON :
+            {{
+                "amount": float ou null,
+                "currency": "EUR/USD/etc" ou null,
+                "category": "hotel/meal/transport/flight" ou "unknown",
+                "subcategory": "breakfast/lunch/dinner/accommodation" ou null,
+                "date": "YYYY-MM-DD" ou null,
+                "vendor": "nom établissement" ou null,
+                "location": "ville/pays" ou null,
+                "country_code": "FR/US/etc" ou null,
+                "confidence": float entre 0 et 1
+            }}
+            
+            Ticket à analyser:
+            {raw_text[:2000]}
+            """
+            
+            # Obtenir le contexte des règles T&E
+            context = self.context_builder.build_context(
+                'ticket_extraction',
+                te_rules_summary=self._get_rules_summary()
+            )
+            
+            # Appel IA
+            ai_response = self.llm_connector.get_llm_response(extraction_prompt, context)
+            
+            # Parser la réponse JSON
+            try:
+                extracted_info = json.loads(ai_response)
+            except:
+                # Fallback si JSON malformé
+                extracted_info = self._parse_ai_response_fallback(ai_response)
+            
+            # Ajouter métadonnées
+            extracted_info.update({
+                "filename": filename,
+                "raw_text": raw_text[:1500],
+                "extraction_method": "ai_rag"
+            })
+            
+            return extracted_info
+            
+        except Exception as e:
+            logger.error(f"Erreur extraction IA: {e}")
+            # Fallback vers méthode basique
+            return self._fallback_extraction(raw_text, filename)
+
+    def _get_rules_summary(self) -> dict:
+        """Résumé des règles pour le contexte IA"""
+        from run import te_documents
+        summary = {}
+        
+        if te_documents.get("excel_rules"):
+            for sheet_name, rules in te_documents["excel_rules"].items():
+                currencies = set(rule.get("currency") for rule in rules if rule.get("currency"))
+                countries = set(rule.get("country") for rule in rules if rule.get("country"))
+                summary[sheet_name] = {
+                    "rules_count": len(rules),
+                    "currencies": list(currencies),
+                    "countries": list(countries)
+                }
+        
+        return summary
+
+    def _parse_ai_response_fallback(self, ai_response: str) -> dict:
+        """Parse la réponse IA si JSON échoue"""
+        info = {
+            "amount": None,
+            "currency": None,
+            "category": "unknown",
+            "confidence": 0.5
+        }
+        
+        # Extraire montant avec regex
+        amount_match = re.search(r'"amount":\s*([0-9.]+)', ai_response)
+        if amount_match:
+            try:
+                info["amount"] = float(amount_match.group(1))
+            except ValueError:
+                pass
+        
+        # Extraire devise
+        currency_match = re.search(r'"currency":\s*"([A-Z]{3})"', ai_response)
+        if currency_match:
+            info["currency"] = currency_match.group(1)
+        
+        # Extraire catégorie
+        category_match = re.search(r'"category":\s*"([^"]+)"', ai_response)
+        if category_match:
+            info["category"] = category_match.group(1)
+        
+        return info
+
+    def _fallback_extraction(self, raw_text: str, filename: str) -> dict:
+        """Fallback si l'extraction IA échoue"""
+        return {
+            "filename": filename,
+            "raw_text": raw_text[:1500],
+            "amount": None,
+            "currency": None,
+            "category": "unknown",
+            "extraction_method": "fallback",
+            "error": "AI extraction failed"
+        }
+
+    def ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
+        """Méthode publique pour extraction IA"""
+        return self._ai_extract_ticket_info(raw_text, filename)
+
     def _get_policies_context(self, criteria: dict) -> str:
         """Obtient le contexte des politiques pertinentes"""
         try:
             if hasattr(self.rag_system, 'search_policies') and self.rag_system:
-                return self.rag_system.search_policies(criteria['category'])
+                category = criteria.get('category', 'general') or 'general'
+                if category == 'unknown':
+                    category = 'general'
+                return self.rag_system.search_policies(category)
             else:
                 # Fallback: utiliser les données Word depuis run.py
                 from run import te_documents
                 word_policies = te_documents.get("word_policies", "")
                 
                 if word_policies:
-                    # Recherche simple par mots-clés dans les politiques
                     category = criteria.get('category', '').lower()
                     relevant_sections = []
                     
                     paragraphs = word_policies.split('\n\n')
                     for paragraph in paragraphs:
-                        if len(paragraph) > 50:  # Ignorer les paragraphes trop courts
+                        if len(paragraph) > 50:
                             if category in paragraph.lower():
                                 relevant_sections.append(paragraph.strip())
                     
                     if relevant_sections:
-                        return '\n\n'.join(relevant_sections[:3])  # Max 3 sections
+                        return '\n\n'.join(relevant_sections[:3])
                     else:
-                        return word_policies[:500] + "..."  # Début du document
+                        return word_policies[:500] + "..."
                 
                 return "Politiques T&E standard - Les frais doivent être justifiés et dans les limites approuvées."
         except Exception as e:
@@ -341,7 +406,6 @@ class TicketAnalyzer:
     
     def _get_general_policies_context(self, question: str) -> str:
         """Obtient le contexte général des politiques pour une question"""
-        # Analyser la question pour identifier les sections pertinentes
         question_lower = question.lower()
         
         if any(word in question_lower for word in ['hotel', 'accommodation', 'lodging']):
@@ -361,7 +425,7 @@ class TicketAnalyzer:
         }
         
         amount = ticket_info.get('amount', 0)
-        if amount <= 0:
+        if not amount or amount <= 0:
             validation['issues'].append("Montant non détecté ou invalide")
             return validation
         
@@ -381,6 +445,54 @@ class TicketAnalyzer:
         
         return validation
     
+    def _determine_expense_type(self, ticket_info: dict, rules: List[Dict]) -> str:
+        """Détermine le type de dépense en français business"""
+        category = ticket_info.get('category', 'unknown')
+        if not category:
+            category = 'unknown'
+            
+        category_lower = category.lower()
+        subcategory = ticket_info.get('subcategory', '').lower()
+        
+        # Mapping vers des termes business clairs
+        expense_mapping = {
+            'hotel': 'Hébergement',
+            'accommodation': 'Hébergement',
+            'meal': 'Repas',
+            'restaurant': 'Repas',
+            'food': 'Repas',
+            'breakfast': 'Petit-déjeuner',
+            'lunch': 'Déjeuner',
+            'dinner': 'Dîner',
+            'transport': 'Transport',
+            'taxi': 'Taxi',
+            'car_rental': 'Location de voiture',
+            'flight': 'Vol',
+            'train': 'Train',
+            'unknown': 'Dépense non catégorisée'
+        }
+        
+        # Priorité aux sous-catégories
+        if subcategory and subcategory in expense_mapping:
+            return expense_mapping[subcategory]
+        elif category_lower and category_lower in expense_mapping:
+            return expense_mapping[category_lower]
+        else:
+            return 'Dépense non catégorisée'
+
+    def _build_justification(self, rules: List[Dict], validation: dict, ticket_info: dict) -> str:
+        """Construit la justification basée sur les règles"""
+        if not rules:
+            return "Aucune règle applicable trouvée dans les documents T&E"
+        
+        if validation['is_valid']:
+            rule = rules[0]  # Première règle applicable
+            amount = ticket_info.get('amount', 0)
+            return f"Conforme à la règle '{rule.get('sheet_name', '')}': montant {amount} {rule.get('currency', '')} ≤ limite {rule.get('amount_limit', 0)} {rule.get('currency', '')} pour {rule.get('country', '')}"
+        else:
+            issues = validation.get('issues', [])
+            return f"Non conforme: {'; '.join(issues)}"
+    
     def _calculate_confidence(self, rules: List[Dict], ticket_info: dict) -> float:
         """Calcule un score de confiance pour l'analyse"""
         confidence = 0.5  # Base
@@ -398,23 +510,6 @@ class TicketAnalyzer:
             confidence += 0.1
         
         return min(confidence, 1.0)
-    
-    def _generate_recommendations(self, ticket_info: dict, rules: List[Dict], validation: dict) -> List[str]:
-        """Génère des recommandations basées sur l'analyse"""
-        recommendations = []
-        
-        if validation['is_valid']:
-            recommendations.append("✅ Dépense conforme aux politiques T&E")
-        else:
-            recommendations.append("⚠️ Dépense nécessite une révision")
-        
-        if validation['issues']:
-            recommendations.append("📋 Vérifier les justificatifs requis")
-        
-        if not rules:
-            recommendations.append("📞 Contacter l'équipe T&E pour clarification")
-        
-        return recommendations
 
 
 def test_ticket_analyzer():
@@ -451,10 +546,10 @@ def test_ticket_analyzer():
     result = analyzer.analyze_ticket(ticket_info, "Ce montant est-il acceptable?")
     
     print("=== TEST TICKET ANALYZER ===")
-    print(f"Status: {result['basic_validation']['status']}")
-    print(f"Valid: {result['basic_validation']['is_valid']}")
+    print(f"Result: {result['result']}")
+    print(f"Expense Type: {result['expense_type']}")
+    print(f"Justification: {result['justification']}")
     print(f"Confidence: {result['confidence_score']}")
-    print(f"Rules applied: {len(result['applied_rules'])}")
 
 
 if __name__ == "__main__":

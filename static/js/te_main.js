@@ -437,9 +437,10 @@ function displaySingleAnalysisResult(result) {
     container.innerHTML = `
         <div class="alert alert-${statusClass}">
             <h6><i class="fas fa-file me-2"></i>${ticket.filename}</h6>
-            <p><strong>Amount:</strong> ${ticket.amount} ${ticket.currency}</p>
-            <p><strong>Category:</strong> ${ticket.category}</p>
-            <p><strong>Status:</strong> ${analysis.basic_validation?.status || 'Unknown'}</p>
+            <p><strong>Result:</strong> ${analysis.result || 'PENDING'}</p>
+            <p><strong>Expense Type:</strong> ${analysis.expense_type || 'Unknown'}</p>
+            <p><strong>Justification:</strong> ${analysis.justification || 'No justification available'}</p>
+            <p><strong>Comment:</strong> ${analysis.comment || 'No comment available'}</p>
             
             ${analysis.applied_rules?.length ? `
                 <details>
@@ -462,7 +463,7 @@ function displaySingleAnalysisResult(result) {
         <div class="mt-2">
             <h6>AI Analysis:</h6>
             <div class="bg-light p-2 rounded">
-                ${analysis.ai_response || 'No AI response available'}
+                ${analysis.comment || 'No AI response available'}
             </div>
         </div>
     `;

@@ -18,7 +18,8 @@ class TEContextBuilder:
         self.context_templates = {
             'ticket_analysis': self._build_ticket_analysis_context,
             'general_query': self._build_general_query_context,
-            'policy_question': self._build_policy_question_context
+            'policy_question': self._build_policy_question_context,
+            'ticket_extraction': self._build_ticket_extraction_context
         }
     
     def build_context(self, context_type: str, **kwargs) -> str:
@@ -26,7 +27,7 @@ class TEContextBuilder:
         Construit un contexte selon le type demandé
         
         Args:
-            context_type: Type de contexte ('ticket_analysis', 'general_query', 'policy_question')
+            context_type: Type de contexte
             **kwargs: Données spécifiques au type de contexte
             
         Returns:
@@ -85,7 +86,7 @@ class TEContextBuilder:
         context_parts.append("1. Vérifier la conformité du montant avec les limites autorisées")
         context_parts.append("2. Valider la catégorie de dépense et le pays")
         context_parts.append("3. Identifier les documents manquants ou problèmes potentiels")
-        context_parts.append("4. Fournir une recommandation claire (Approuvé/Rejeté/En attente)")
+        context_parts.append("4. Fournir une recommandation claire et professionnelle")
         context_parts.append("5. Justifier la décision en citant les règles applicables")
         
         return "\n".join(context_parts)
@@ -120,7 +121,34 @@ class TEContextBuilder:
         context_parts.append("Réponds de manière précise en te basant sur les règles et politiques fournies.")
         
         return "\n".join(context_parts)
-    
+
+    def _build_ticket_extraction_context(self, te_rules_summary: dict = None, **kwargs) -> str:
+        """Contexte pour l'extraction IA de tickets"""
+        context_parts = []
+        
+        context_parts.append("=== EXTRACTION INTELLIGENTE TICKET T&E ===")
+        context_parts.append("Tu es un expert en analyse de tickets de frais.")
+        context_parts.append("")
+        
+        if te_rules_summary:
+            context_parts.append("CATÉGORIES COUVERTES PAR LES RÈGLES:")
+            for sheet_name, info in te_rules_summary.items():
+                context_parts.append(f"- {sheet_name}: {info['rules_count']} règles")
+                if info.get('currencies'):
+                    context_parts.append(f"  Devises: {', '.join(info['currencies'])}")
+                if info.get('countries'):
+                    context_parts.append(f"  Pays: {', '.join(info['countries'])}")
+            context_parts.append("")
+        
+        context_parts.append("INSTRUCTIONS:")
+        context_parts.append("1. Extrait PRÉCISÉMENT le montant et la devise")
+        context_parts.append("2. Catégorise: hotel, meal, transport, flight")
+        context_parts.append("3. Sous-catégorise si possible: breakfast, lunch, dinner")
+        context_parts.append("4. Identifie le lieu et pays (code ISO)")
+        context_parts.append("5. Retourne un JSON valide UNIQUEMENT")
+        
+        return "\n".join(context_parts)
+
     def _build_policy_question_context(self, question_topic: str, relevant_policies: str, 
                                      related_rules: List[Dict] = None, **kwargs) -> str:
         """Construit le contexte pour une question spécifique sur les politiques"""
@@ -146,22 +174,24 @@ class TEContextBuilder:
         return "\n".join(context_parts)
     
     def build_prompt_for_ticket_analysis(self, user_question: str, ticket_info: dict) -> str:
-        """Construit le prompt utilisateur pour l'analyse de ticket"""
+        """Construit le prompt utilisateur pour l'analyse de ticket - Format business"""
         if user_question.strip():
             prompt = f"Question spécifique: {user_question}\n\n"
         else:
-            prompt = "Analyse ce ticket T&E selon les politiques de l'entreprise.\n\n"
+            prompt = "Analyse ce ticket T&E et fournis un commentaire business professionnel.\n\n"
         
         prompt += "INFORMATIONS DU TICKET:\n"
         prompt += f"- Montant: {ticket_info.get('amount', 'Non détecté')} {ticket_info.get('currency', 'N/A')}\n"
-        prompt += f"- Catégorie: {ticket_info.get('category', 'Non déterminée')}\n"
+        prompt += f"- Type: {ticket_info.get('category', 'Non déterminée')}\n"
         prompt += f"- Date: {ticket_info.get('date', 'Non détectée')}\n"
         prompt += f"- Établissement: {ticket_info.get('vendor', 'Non détecté')}\n\n"
         
-        prompt += "Merci de fournir:\n"
-        prompt += "1. Statut de validation (Approuvé/Rejeté/Révision nécessaire)\n"
-        prompt += "2. Justification basée sur les règles T&E\n"
-        prompt += "3. Actions recommandées si nécessaire"
+        prompt += "Fournis un commentaire professionnel incluant:\n"
+        prompt += "- Validation par rapport aux politiques T&E\n"
+        prompt += "- Points d'attention éventuels\n"
+        prompt += "- Actions recommandées si nécessaire\n"
+        prompt += "- Ton professionnel et concis\n"
+        prompt += "- Évite les répétitions avec les données déjà affichées"
         
         return prompt
     
@@ -174,41 +204,42 @@ def test_context_builder():
     """Teste le constructeur de contexte"""
     builder = TEContextBuilder()
     
-    # Test contexte analyse ticket
-    ticket_info = {
-        'filename': 'receipt_hotel_paris.pdf',
-        'amount': 180,
-        'currency': 'EUR',
-        'category': 'hotel',
-        'date': '2024-03-15',
-        'vendor': 'Hotel Le Marais'
+    # Test contexte extraction
+    te_rules_summary = {
+        "Hotel": {
+            "rules_count": 45,
+            "currencies": ["EUR", "USD", "GBP"],
+            "countries": ["FR", "DE", "GB"]
+        },
+        "Internal staff Meal": {
+            "rules_count": 120,
+            "currencies": ["EUR", "USD", "JPY"],
+            "countries": ["FR", "JP", "US"]
+        }
     }
     
-    relevant_rules = [{
-        'type': 'Hotel1',
-        'country': 'FR',
-        'currency': 'EUR',
-        'amount_limit': 200,
-        'sheet_name': 'Hotel'
-    }]
-    
     context = builder.build_context(
-        'ticket_analysis',
-        ticket_info=ticket_info,
-        relevant_rules=relevant_rules,
-        policies_context="Les hôtels doivent être pré-approuvés pour les séjours > 3 nuits..."
+        'ticket_extraction',
+        te_rules_summary=te_rules_summary
     )
     
-    print("=== TEST CONTEXT BUILDER ===")
-    print(context[:500] + "...")
+    print("=== TEST CONTEXT BUILDER - EXTRACTION ===")
+    print(context)
     
-    # Test prompt
+    # Test prompt business
+    ticket_info = {
+        'amount': 57.5,
+        'currency': 'EUR',
+        'category': 'meal',
+        'vendor': 'Pizza Roma'
+    }
+    
     prompt = builder.build_prompt_for_ticket_analysis(
-        "Ce montant est-il dans les limites autorisées?",
+        "",
         ticket_info
     )
     
-    print(f"\nPROMPT: {prompt}")
+    print(f"\n=== PROMPT BUSINESS ===\n{prompt}")
 
 
 if __name__ == "__main__":
