@@ -422,7 +422,337 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
 
-# [Autres routes inchangées...]
+@app.post("/api/feedback")
+async def submit_feedback(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+):
+    """Soumet un feedback sur une réponse du chatbot"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        data = await request.json()
+        
+        feedback_record = {
+            "timestamp": datetime.now().isoformat(),
+            "user": current_user["username"],
+            "analysis_id": data.get("analysis_id", ""),
+            "rating": data.get("rating", 0),
+            "comment": data.get("comment", ""),
+            "issue_type": data.get("issue_type", "")
+        }
+        
+        # Sauvegarder en CSV local
+        save_feedback_to_csv(feedback_record)
+        
+        # Ajouter à la session
+        chatbot_session["feedback_data"].append(feedback_record)
+        
+        log_activity(current_user["username"], "FEEDBACK", f"Rating: {feedback_record['rating']}, Issue: {feedback_record['issue_type']}")
+        
+        return {
+            "success": True,
+            "message": "Feedback submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
+
+@app.get("/api/analysis-history")
+async def get_analysis_history(session_token: Optional[str] = Cookie(None)):
+    """Récupère l'historique des analyses"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Filtrer par utilisateur si non admin
+    if current_user["role"] == "admin":
+        history = chatbot_session["analysis_history"]
+    else:
+        history = [
+            record for record in chatbot_session["analysis_history"]
+            if record.get("user") == current_user["username"]
+        ]
+    
+    return {
+        "success": True,
+        "history": history[-20:],  # Derniers 20 enregistrements
+        "total": len(history)
+    }
+
+@app.get("/api/te-status")
+async def get_te_status():
+    """Vérifie le statut des documents T&E"""
+    return {
+        "documents_loaded": bool(te_documents["excel_rules"]),
+        "last_loaded": te_documents["last_loaded"],
+        "excel_rules_count": len(te_documents["excel_rules"]) if te_documents["excel_rules"] else 0,
+        "word_policies_available": bool(te_documents["word_policies"]),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/view-excel")
+async def view_excel_document(session_token: Optional[str] = Cookie(None)):
+    """Retourne le contenu Excel formaté pour visualisation"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["excel_rules"]:
+        raise HTTPException(status_code=404, detail="Excel document not loaded")
+    
+    try:
+        # Formater les données Excel pour affichage tableau
+        formatted_data = {}
+        total_rules = 0
+        
+        for sheet_name, rules in te_documents["excel_rules"].items():
+            formatted_data[sheet_name] = {
+                "columns": ["Currency", "Country", "Type", "Amount Limit"],
+                "rows": []
+            }
+            
+            for rule in rules:
+                formatted_data[sheet_name]["rows"].append([
+                    rule.get("currency", "N/A"),
+                    rule.get("country", "N/A"), 
+                    rule.get("type", "N/A"),
+                    f"{rule.get('amount_limit', 0)}"
+                ])
+            
+            total_rules += len(rules)
+        
+        log_activity(current_user["username"], "VIEW_EXCEL", f"Viewed Excel document - {total_rules} rules")
+        
+        return {
+            "success": True,
+            "filename": "Consolidated Limits.xlsx",
+            "sheets": formatted_data,
+            "total_rules": total_rules,
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Excel: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Excel: {str(e)}")
+
+@app.get("/api/view-word")
+async def view_word_document(session_token: Optional[str] = Cookie(None)):
+    """Retourne le contenu Word pour visualisation PDF-like"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["word_policies"]:
+        raise HTTPException(status_code=404, detail="Word document not loaded")
+    
+    try:
+        # Formater le texte Word en sections pour un affichage PDF-like
+        sections = []
+        current_section = {"title": "Introduction", "content": ""}
+        
+        paragraphs = te_documents["word_policies"].split('\n\n')
+        
+        for paragraph in paragraphs:
+            if paragraph.strip():
+                # Détecter si c'est un titre (ligne courte avec mots-clés)
+                if (len(paragraph.strip()) < 100 and 
+                    any(keyword in paragraph.lower() for keyword in 
+                        ['policy', 'procedure', 'rule', 'expense', 'travel', 'accommodation', 'meal'])):
+                    
+                    # Sauvegarder la section précédente si elle a du contenu
+                    if current_section["content"].strip():
+                        sections.append(current_section.copy())
+                    
+                    # Commencer une nouvelle section
+                    current_section = {
+                        "title": paragraph.strip(),
+                        "content": ""
+                    }
+                else:
+                    current_section["content"] += paragraph + "\n\n"
+        
+        # Ajouter la dernière section
+        if current_section["content"].strip():
+            sections.append(current_section)
+        
+        log_activity(current_user["username"], "VIEW_WORD", f"Viewed Word document - {len(sections)} sections")
+        
+        return {
+            "success": True,
+            "filename": "APAC Travel Entertainment Procedure Mar2025_Clean.docx",
+            "sections": sections,
+            "total_sections": len(sections),
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Word: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
+
+@app.post("/api/refresh-documents")
+async def refresh_te_documents(session_token: Optional[str] = Cookie(None)):
+    """Force le rechargement des documents T&E depuis SharePoint"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        log_activity(current_user["username"], "REFRESH_DOCUMENTS", "Manual refresh of T&E documents")
+        
+        success = await load_te_documents_from_sharepoint()
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Documents refreshed successfully from SharePoint",
+                "last_loaded": te_documents["last_loaded"],
+                "status": te_documents["load_status"]
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Failed to refresh documents: {te_documents.get('error_message', 'Unknown error')}",
+                "status": te_documents["load_status"]
+            }
+            
+    except Exception as e:
+        logger.error(f"Erreur refresh documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error refreshing documents: {str(e)}")
+
+@app.get("/api/logs")
+async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    logs = get_logs(limit)
+    return {
+        "success": True,
+        "logs": logs,
+        "total": len(logs)
+    }
+
+@app.get("/api/users")
+async def get_users_list(session_token: Optional[str] = Cookie(None)):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = [
+        {
+            "username": user["username"],
+            "full_name": user["full_name"], 
+            "role": user["role"],
+            "created_at": user["created_at"]
+        }
+        for user in USERS_DB.values()
+    ]
+    
+    return {
+        "success": True,
+        "users": users
+    }
+
+@app.get("/api/feedback-stats")
+async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
+    """Statistiques sur les feedbacks (admins seulement)"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        import csv
+        import os
+        
+        feedback_file = "data/feedback.csv"
+        stats = {
+            "total_feedback": 0,
+            "average_rating": 0.0,
+            "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+            "common_issues": {}
+        }
+        
+        if os.path.exists(feedback_file):
+            with open(feedback_file, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                ratings = []
+                
+                for row in reader:
+                    stats["total_feedback"] += 1
+                    
+                    # Rating distribution
+                    rating = int(row.get('rating', 0))
+                    if 1 <= rating <= 5:
+                        stats["rating_distribution"][rating] += 1
+                        ratings.append(rating)
+                    
+                    # Common issues
+                    issue_type = row.get('issue_type', 'unknown')
+                    stats["common_issues"][issue_type] = stats["common_issues"].get(issue_type, 0) + 1
+                
+                # Average rating
+                if ratings:
+                    stats["average_rating"] = round(sum(ratings) / len(ratings), 2)
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur stats feedback: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+# Fonction utilitaire pour sauvegarder feedback
+def save_feedback_to_csv(feedback_record: dict):
+    """Sauvegarde le feedback dans un fichier CSV local"""
+    try:
+        import csv
+        import os
+        
+        feedback_file = "data/feedback.csv"
+        
+        # Créer le header si le fichier n'existe pas
+        file_exists = os.path.exists(feedback_file)
+        
+        with open(feedback_file, mode='a', newline='', encoding='utf-8') as file:
+            fieldnames = ['timestamp', 'user', 'analysis_id', 'rating', 'comment', 'issue_type']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            if not file_exists:
+                writer.writeheader()
+            
+            writer.writerow(feedback_record)
+        
+        logger.info(f"Feedback sauvegardé: {feedback_record['rating']}/5")
+        
+    except Exception as e:
+        logger.error(f"Erreur sauvegarde feedback: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    """Événements au démarrage de l'application"""
+    logger.info("🚀 Démarrage T&E Chatbot - Chargement des documents...")
+    await load_te_documents_from_sharepoint()
 
 #######################################################################################################################################
 #                           UTILITY FUNCTIONS - EXTRACTION TEXTE SEULEMENT
