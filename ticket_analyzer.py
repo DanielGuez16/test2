@@ -27,92 +27,79 @@ class TicketAnalyzer:
         self.context_builder = TEContextBuilder()
     
     def analyze_ticket(self, ticket_info: dict, user_question: str = "") -> dict:
-        """
-        Analyse complète d'un ticket T&E
-        
-        Args:
-            ticket_info: Informations extraites du ticket par IA
-            user_question: Question spécifique de l'utilisateur
-            
-        Returns:
-            dict: Résultat complet de l'analyse au format business
-        """
+        """Analyse complète d'un ticket T&E avec IA directe (sans RAG)"""
         logger.info(f"Début analyse ticket: {ticket_info.get('filename', 'N/A')}")
         
         try:
-            # 1. Extraire les critères d'analyse
-            analysis_criteria = self._extract_analysis_criteria(ticket_info)
+            from run import te_documents
             
-            # 2. Rechercher les règles pertinentes via RAG
-            relevant_rules = self._find_relevant_rules(analysis_criteria)
+            # Construire le contexte complet avec TOUTES les données
+            full_context = self._build_complete_context()
             
-            # 3. Obtenir le contexte des politiques
-            policies_context = self._get_policies_context(analysis_criteria)
+            # Construire le prompt d'analyse
+            prompt = f"""
+            QUESTION: {user_question if user_question else "Analyze this T&E expense according to company policies."}
             
-            # 4. Validation basique contre les règles trouvées
-            basic_validation = self._perform_basic_validation(ticket_info, relevant_rules)
+            TICKET INFORMATION:
+            - Amount: {ticket_info.get('amount', 'Not detected')} {ticket_info.get('currency', 'N/A')}
+            - Category: {ticket_info.get('category', 'Unknown')}
+            - Date: {ticket_info.get('date', 'Not detected')}
+            - Vendor: {ticket_info.get('vendor', 'Not detected')}
+            - Location: {ticket_info.get('location', 'Not detected')}
             
-            # 5. Préparer le contexte pour l'IA
-            context = self.context_builder.build_context(
-                'ticket_analysis',
-                ticket_info=ticket_info,
-                relevant_rules=relevant_rules,
-                policies_context=policies_context
-            )
+            Please provide:
+            1. PASS or FAIL decision
+            2. Expense type (Hotel/Meal/Breakfast/Transport etc.)
+            3. Justification based on the T&E rules
+            4. Professional comment with recommendations
             
-            # 6. Préparer le prompt utilisateur
-            prompt = self.context_builder.build_prompt_for_ticket_analysis(user_question, ticket_info)
+            Answer in English since the policies are in English.
+            """
             
-            # 7. Obtenir l'analyse IA
-            ai_response = self.llm_connector.get_llm_response(prompt, context)
+            # Appel direct à l'IA avec contexte complet
+            ai_response = self.llm_connector.get_llm_response(prompt, full_context)
             
-            # 8. Structurer le résultat final au FORMAT BUSINESS
-            analysis_result = {
-                'result': 'PASS' if basic_validation['is_valid'] else 'FAIL',
-                'expense_type': self._determine_expense_type(ticket_info, relevant_rules),
-                'justification': self._build_justification(relevant_rules, basic_validation, ticket_info),
-                'comment': ai_response,  # Commentaire IA complet
-                'confidence_score': self._calculate_confidence(relevant_rules, ticket_info),
-                'applied_rules': relevant_rules,  # Pour debug
+            # Parser la réponse pour extraire les éléments
+            result_info = self._parse_ai_analysis_response(ai_response, ticket_info)
+            
+            return {
+                'result': result_info['result'],
+                'expense_type': result_info['expense_type'],
+                'justification': result_info['justification'],
+                'comment': ai_response,
+                'confidence_score': 0.95,  # Haute confiance avec données complètes
+                'applied_rules': [],  # Plus besoin avec l'approche directe
                 'timestamp': datetime.now().isoformat()
             }
-            
-            logger.info(f"Analyse terminée avec succès - Result: {analysis_result['result']}")
-            return analysis_result
             
         except Exception as e:
             logger.error(f"Erreur lors de l'analyse du ticket: {str(e)}")
             return {
                 'result': 'FAIL',
-                'expense_type': 'Erreur d\'analyse',
-                'justification': f'Erreur technique: {str(e)}',
-                'comment': f"Erreur lors de l'analyse: {str(e)}",
+                'expense_type': 'Analysis Error',
+                'justification': f'Technical error: {str(e)}',
+                'comment': f"Error during analysis: {str(e)}",
                 'confidence_score': 0.0,
-                'applied_rules': [],
-                'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
-    
+
     def answer_general_question(self, user_question: str, te_rules_summary: dict) -> dict:
-        """
-        Répond à une question générale sur les politiques T&E
-        """
+        """Répond à une question générale avec contexte complet"""
         try:
-            # Obtenir le contexte général
-            policies_context = self._get_general_policies_context(user_question)
+            from run import te_documents
             
-            # Construire le contexte
-            context = self.context_builder.build_context(
-                'general_query',
-                te_rules_summary=te_rules_summary,
-                policies_excerpt=policies_context
-            )
+            # Contexte complet pour question générale
+            full_context = self._build_complete_context()
             
-            # Construire le prompt
-            prompt = self.context_builder.build_prompt_for_general_query(user_question)
+            prompt = f"""
+            QUESTION: {user_question}
             
-            # Obtenir la réponse IA
-            ai_response = self.llm_connector.get_llm_response(prompt, context)
+            Please answer based on the complete T&E policies and rules provided.
+            Be specific and cite the relevant rules or policies.
+            Answer in English.
+            """
+            
+            ai_response = self.llm_connector.get_llm_response(prompt, full_context)
             
             return {
                 'ai_response': ai_response,
@@ -123,11 +110,12 @@ class TicketAnalyzer:
         except Exception as e:
             logger.error(f"Erreur réponse question générale: {str(e)}")
             return {
-                'ai_response': f"Erreur lors du traitement de votre question: {str(e)}",
+                'ai_response': f"Error processing your question: {str(e)}",
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
-    
+
+
     def _extract_analysis_criteria(self, ticket_info: dict) -> dict:
         """Extrait les critères d'analyse du ticket"""
         return {
@@ -158,105 +146,8 @@ class TicketAnalyzer:
         }
         
         return mapping.get(category_lower, 'Meal1')
-    
-    def _find_relevant_rules(self, criteria: dict) -> List[Dict]:
-        """Trouve les règles pertinentes via le système RAG"""
-        try:
-            if hasattr(self.rag_system, 'search_relevant_rules') and self.rag_system:
-                # Utiliser le système RAG
-                query = f"{criteria['expense_type']} {criteria['country']} {criteria['currency']}"
-                return self.rag_system.search_relevant_rules(query, filters=criteria)
-            else:
-                # Fallback: recherche directe dans les données Excel
-                return self._fallback_rule_search_with_excel_data(criteria)
-        except Exception as e:
-            logger.warning(f"Erreur recherche règles RAG: {e}, utilisation fallback")
-            return self._fallback_rule_search_with_excel_data(criteria)
-    
-    def _fallback_rule_search_with_excel_data(self, criteria: dict) -> List[Dict]:
-        """Recherche de règles en fallback"""
-        from run import te_documents
-        
-        rules = []
-        excel_rules = te_documents.get("excel_rules")
-        
-        if not excel_rules:
-            logger.warning("Aucune donnée Excel chargée")
-            return []
-        
-        currency = criteria.get("currency", "")
-        country = criteria.get("country", "")
-        expense_type = criteria.get("expense_type", "")
-        
-        # Mapper les types de dépenses aux sheets Excel
-        sheet_mapping = {
-            "Hotel1": "Hotel",
-            "Meal1": "Internal staff Meal",
-            "Breakfast1": "Breakfast & Lunch & Dinner"
-        }
-        
-        # Chercher dans la sheet appropriée
-        target_sheets = []
-        if expense_type in sheet_mapping:
-            target_sheets.append(sheet_mapping[expense_type])
-        else:
-            target_sheets = list(excel_rules.keys())
-        
-        for sheet_name in target_sheets:
-            if sheet_name not in excel_rules:
-                continue
-                
-            sheet_rules = excel_rules[sheet_name]
-            for rule in sheet_rules:
-                rule_matches = True
-                
-                if currency and rule.get("currency") != currency:
-                    rule_matches = False
-                
-                if country and rule.get("country") != country:
-                    rule_matches = False
-                
-                if sheet_name == "Breakfast & Lunch & Dinner":
-                    if expense_type == "Meal1" and rule.get("type") not in ["Meal1", "Breakfast1"]:
-                        rule_matches = False
-                    elif expense_type == "Breakfast1" and rule.get("type") != "Breakfast1":
-                        rule_matches = False
-                else:
-                    if expense_type and rule.get("type") != expense_type:
-                        rule_matches = False
-                
-                if rule_matches:
-                    formatted_rule = {
-                        "sheet_name": sheet_name,
-                        "currency": rule.get("currency"),
-                        "country": rule.get("country"),
-                        "type": rule.get("type"),
-                        "amount_limit": rule.get("amount_limit", 0)
-                    }
-                    rules.append(formatted_rule)
-        
-        # Si pas de correspondance exacte, chercher partiellement
-        if not rules:
-            for sheet_name, sheet_rules in excel_rules.items():
-                for rule in sheet_rules:
-                    if currency and rule.get("currency") == currency:
-                        formatted_rule = {
-                            "sheet_name": sheet_name,
-                            "currency": rule.get("currency"),
-                            "country": rule.get("country"),
-                            "type": rule.get("type"),
-                            "amount_limit": rule.get("amount_limit", 0)
-                        }
-                        rules.append(formatted_rule)
-                        
-                        if len(rules) >= 5:
-                            break
-                if len(rules) >= 5:
-                    break
-        
-        logger.info(f"Fallback search trouvé {len(rules)} règles pour {criteria}")
-        return rules[:10]
-    
+
+
     def _ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
         """Extrait TOUTES les informations du ticket via IA + RAG"""
         try:
@@ -371,80 +262,7 @@ class TicketAnalyzer:
         """Méthode publique pour extraction IA"""
         return self._ai_extract_ticket_info(raw_text, filename)
 
-    def _get_policies_context(self, criteria: dict) -> str:
-        """Obtient le contexte des politiques pertinentes"""
-        try:
-            if hasattr(self.rag_system, 'search_policies') and self.rag_system:
-                category = criteria.get('category', 'general') or 'general'
-                if category == 'unknown':
-                    category = 'general'
-                return self.rag_system.search_policies(category)
-            else:
-                # Fallback: utiliser les données Word depuis run.py
-                from run import te_documents
-                word_policies = te_documents.get("word_policies", "")
-                
-                if word_policies:
-                    category = criteria.get('category', '').lower()
-                    relevant_sections = []
-                    
-                    paragraphs = word_policies.split('\n\n')
-                    for paragraph in paragraphs:
-                        if len(paragraph) > 50:
-                            if category in paragraph.lower():
-                                relevant_sections.append(paragraph.strip())
-                    
-                    if relevant_sections:
-                        return '\n\n'.join(relevant_sections[:3])
-                    else:
-                        return word_policies[:500] + "..."
-                
-                return "Politiques T&E standard - Les frais doivent être justifiés et dans les limites approuvées."
-        except Exception as e:
-            logger.warning(f"Erreur récupération contexte politiques: {e}")
-            return "Contexte politiques non disponible."
-    
-    def _get_general_policies_context(self, question: str) -> str:
-        """Obtient le contexte général des politiques pour une question"""
-        question_lower = question.lower()
-        
-        if any(word in question_lower for word in ['hotel', 'accommodation', 'lodging']):
-            return "Politiques hôtels: Pré-approbation requise pour séjours > 3 nuits..."
-        elif any(word in question_lower for word in ['meal', 'restaurant', 'food', 'dining']):
-            return "Politiques repas: Limites par pays et devise, justificatifs requis..."
-        else:
-            return "Politiques générales T&E applicables..."
-    
-    def _perform_basic_validation(self, ticket_info: dict, relevant_rules: List[Dict]) -> dict:
-        """Effectue une validation basique contre les règles"""
-        validation = {
-            'is_valid': False,
-            'status': 'pending_review',
-            'issues': [],
-            'within_limits': False
-        }
-        
-        amount = ticket_info.get('amount', 0)
-        if not amount or amount <= 0:
-            validation['issues'].append("Montant non détecté ou invalide")
-            return validation
-        
-        # Vérifier contre les règles trouvées
-        if relevant_rules:
-            for rule in relevant_rules:
-                limit = rule.get('amount_limit', 0)
-                if amount <= limit:
-                    validation['is_valid'] = True
-                    validation['status'] = 'approved'
-                    validation['within_limits'] = True
-                    break
-                else:
-                    validation['issues'].append(f"Montant {amount} dépasse la limite de {limit}")
-        else:
-            validation['issues'].append("Aucune règle applicable trouvée")
-        
-        return validation
-    
+
     def _determine_expense_type(self, ticket_info: dict, rules: List[Dict]) -> str:
         """Détermine le type de dépense en français business"""
         category = ticket_info.get('category', 'unknown')
@@ -511,6 +329,69 @@ class TicketAnalyzer:
         
         return min(confidence, 1.0)
 
+    def _build_complete_context(self) -> str:
+        """Construit un contexte complet avec TOUTES les données T&E"""
+        from run import te_documents
+        
+        context_parts = []
+        
+        context_parts.append("=== COMPLETE T&E RULES AND POLICIES ===")
+        context_parts.append("You are a T&E expense analysis expert for APAC region.")
+        context_parts.append("")
+        
+        # TOUTES les règles Excel - 3 sheets complètes
+        if te_documents.get("excel_rules"):
+            context_parts.append("COMPLETE EXCEL RULES:")
+            
+            for sheet_name, rules in te_documents["excel_rules"].items():
+                context_parts.append(f"\n{sheet_name} Sheet:")
+                context_parts.append(f"Total rules: {len(rules)}")
+                
+                for rule in rules:
+                    rule_line = f"- Currency: {rule.get('currency', 'N/A')}, Country: {rule.get('country', 'N/A')}, Type: {rule.get('type', 'N/A')}, Limit: {rule.get('amount_limit', 0)}"
+                    context_parts.append(rule_line)
+            
+            context_parts.append("")
+        
+        # TOUT le document Word - 16 pages complètes
+        if te_documents.get("word_policies"):
+            context_parts.append("COMPLETE WORD POLICIES (16 pages):")
+            context_parts.append(te_documents["word_policies"])
+            context_parts.append("")
+        
+        context_parts.append("=== END OF COMPLETE T&E DATA ===")
+        
+        return "\n".join(context_parts)
+
+    def _parse_ai_analysis_response(self, ai_response: str, ticket_info: dict) -> dict:
+        """Parse la réponse IA pour extraire les éléments structurés"""
+        
+        # Détection simple basée sur mots-clés
+        result = "FAIL"
+        if any(word in ai_response.upper() for word in ["PASS", "APPROVED", "COMPLIANT", "VALID"]):
+            result = "PASS"
+        
+        expense_type = "Unknown"
+        if "hotel" in ai_response.lower():
+            expense_type = "Hotel"
+        elif "breakfast" in ai_response.lower():
+            expense_type = "Breakfast"
+        elif "meal" in ai_response.lower():
+            expense_type = "Meal"
+        
+        # Extraction de justification (premier paragraphe qui mentionne une limite)
+        justification = "Analysis based on complete T&E policies and rules"
+        lines = ai_response.split('\n')
+        for line in lines:
+            if any(word in line.lower() for word in ["limit", "rule", "policy", "exceed"]):
+                justification = line.strip()
+                break
+        
+        return {
+            'result': result,
+            'expense_type': expense_type,
+            'justification': justification
+        }
 
 def test_ticket_analyzer():
     """Teste l'analyseur de tickets"""
