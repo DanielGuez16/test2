@@ -667,7 +667,7 @@ async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: 
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    logs = get_logs(limit)  # Fonction simple du projet qui marche
+    logs = get_logs(limit)
     return {
         "success": True,
         "logs": logs,
