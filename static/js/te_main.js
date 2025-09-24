@@ -344,6 +344,7 @@ function clearChat() {
 function handleTicketUpload(file) {
     console.log('=== handleTicketUpload called ===');
     console.log('File:', file ? file.name : 'null');
+    console.log('isAnalyzing:', isAnalyzing);
     
     if (!file || isAnalyzing) {
         console.log('No file provided or already analyzing, exiting');
@@ -360,15 +361,18 @@ function handleTicketUpload(file) {
     currentTicketFile = file;
     console.log('File stored:', currentTicketFile.name);
     
-    // Mettre à jour l'interface (nouvelle fonction)
+    // Mettre à jour l'interface
     updateUploadUI(file);
     
     // Activer le bouton d'analyse
     const analyzeBtn = document.getElementById('analyze-btn');
     if (analyzeBtn) {
+        console.log('Activating analyze button');
         analyzeBtn.disabled = false;
         analyzeBtn.classList.remove('disabled');
         analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+    } else {
+        console.error('Analyze button not found!');
     }
 }
 
@@ -383,8 +387,8 @@ function updateUploadUI(file) {
         uploadIcon.style.color = 'var(--success)';
     }
     
-    // Mettre à jour le titre
-    const title = uploadCard.querySelector('h3');
+    // Mettre à jour le titre - chercher h4 au lieu de h3
+    const title = uploadCard.querySelector('h4');
     if (title) {
         title.textContent = 'File Ready for Analysis';
     }
@@ -410,8 +414,8 @@ function resetUploadUI() {
         uploadIcon.style.color = 'var(--primary)';
     }
     
-    // Réinitialiser le titre
-    const title = uploadCard.querySelector('h3');
+    // Réinitialiser le titre - chercher h4 au lieu de h3
+    const title = uploadCard.querySelector('h4');
     if (title) {
         title.textContent = 'Drop Your Ticket Here';
     }
@@ -437,7 +441,6 @@ function showTicketStatus(type, message) {
     `;
 }
 
-
 async function analyzeTicket() {
     if (!currentTicketFile || isAnalyzing) {
         console.log('Cannot analyze: no file or already analyzing');
@@ -446,7 +449,6 @@ async function analyzeTicket() {
     
     console.log('Starting ticket analysis...'); 
     
-    // Marquer comme en cours pour éviter les doubles clics
     isAnalyzing = true;
     
     // Désactiver le bouton et afficher loading
@@ -457,18 +459,19 @@ async function analyzeTicket() {
         analyzeBtn.style.pointerEvents = 'none';
     }
     
-    // Afficher la zone de résultats avec loading SANS scroller
+    // Afficher la zone de résultats avec loading - utiliser le bon conteneur
     const resultsSection = document.getElementById('analysis-results');
-    if (resultsSection) {
+    const resultContent = document.getElementById('result-content');
+    
+    if (resultsSection && resultContent) {
         resultsSection.style.display = 'block';
-        resultsSection.innerHTML = `
-            <div class="loading-overlay">
-                <div class="spinner-custom"></div>
-                <div class="loading-text">AI is analyzing your ticket...</div>
-                <div class="progress-custom mt-3">
-                    <div class="progress-bar-custom" style="width: 100%;"></div>
+        resultContent.innerHTML = `
+            <div class="result-card">
+                <div class="text-center py-4">
+                    <div class="spinner-custom mb-3"></div>
+                    <h5 class="text-primary">Analyzing Your Ticket</h5>
+                    <p class="text-muted">AI is processing the document...</p>
                 </div>
-                <small class="text-muted mt-2">This may take a few moments</small>
             </div>
         `;
     }
@@ -501,7 +504,7 @@ async function analyzeTicket() {
         console.error('Erreur analyse:', error);
         displayAnalysisError(error.message);
     } finally {
-        // Restaurer le bouton avec un délai pour éviter les double-clics
+        // Restaurer le bouton avec un délai
         setTimeout(() => {
             if (analyzeBtn) {
                 analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
@@ -510,7 +513,7 @@ async function analyzeTicket() {
             }
             isAnalyzing = false;
             console.log('Analysis completed, button restored'); 
-        }, 1000);
+        }, 500);
     }
 }
 
@@ -576,8 +579,8 @@ function scrollToUpload() {
 }
 
 function displayAnalysisResult(result) {
-    const resultsSection = document.getElementById('analysis-results');
-    if (!resultsSection) return;
+    const resultContent = document.getElementById('result-content');
+    if (!resultContent) return;
     
     const analysis = result.analysis_result;
     const ticket = result.ticket_info;
@@ -587,41 +590,30 @@ function displayAnalysisResult(result) {
     const statusIcon = isPass ? 'fa-check-circle' : 'fa-exclamation-triangle';
     const statusColor = isPass ? 'var(--success)' : 'var(--warning)';
     
-    resultsSection.innerHTML = `
+    resultContent.innerHTML = `
         <div class="result-card ${statusClass}">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="result-icon" style="color: ${statusColor}; font-size: 2rem;">
-                        <i class="fas ${statusIcon}"></i>
+            <div class="result-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <div class="result-icon" style="color: ${statusColor};">
+                            <i class="fas ${statusIcon}"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-1">${analysis.result}</h4>
+                            <p class="text-muted mb-0">${analysis.expense_type}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="mb-1">${analysis.result}</h4>
-                        <p class="text-muted mb-0">${analysis.expense_type}</p>
-                    </div>
-                </div>
-                <div class="text-end">
-                    <div class="badge bg-light text-dark px-3 py-2 fs-6">
+                    <div class="badge bg-light text-dark px-3 py-2">
                         ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
                     </div>
                 </div>
             </div>
             
-            <!-- Zone de contenu repliable -->
-            <div class="analysis-content">
-                <button class="btn btn-link p-0 text-start w-100 d-flex align-items-center justify-content-between" 
-                        type="button" data-bs-toggle="collapse" data-bs-target="#analysisDetails">
-                    <span><i class="fas fa-file-alt me-2"></i>View Analysis Details</span>
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-                
-                <div class="collapse show" id="analysisDetails">
-                    <div class="p-3 mt-2 rounded-3" style="background: rgba(248, 250, 252, 0.8); border-left: 4px solid ${statusColor}; max-height: 200px; overflow-y: auto;">
-                        ${formatAIResponse(analysis.justification)}
-                    </div>
-                </div>
+            <div class="result-content">
+                ${formatAIResponse(analysis.justification)}
             </div>
             
-            <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="result-actions">
                 <small class="text-muted">
                     <i class="fas fa-robot me-1"></i>
                     Analysis completed • ${new Date().toLocaleTimeString()}
@@ -631,50 +623,43 @@ function displayAnalysisResult(result) {
                         <i class="fas fa-star me-1"></i> Rate
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" onclick="resetAnalysis()">
-                        <i class="fas fa-redo me-1"></i> New
-                    </button>
-                    <button class="btn btn-outline-info btn-sm" onclick="scrollToTop()">
-                        <i class="fas fa-arrow-up me-1"></i> Top
+                        <i class="fas fa-redo me-1"></i> New Analysis
                     </button>
                 </div>
             </div>
         </div>
     `;
-    
-    // NE PAS faire de scroll automatique - laisser l'utilisateur contrôler
-    // Juste afficher une notification subtile
-    showResultNotification(isPass);
 }
 
 function displayAnalysisError(errorMessage) {
-    const resultsSection = document.getElementById('analysis-results');
-    if (!resultsSection) return;
+    const resultContent = document.getElementById('result-content');
+    if (!resultContent) return;
     
-    resultsSection.innerHTML = `
+    resultContent.innerHTML = `
         <div class="result-card danger">
-            <div class="d-flex align-items-center gap-3 mb-3">
-                <div class="result-icon" style="color: var(--danger); font-size: 2rem;">
-                    <i class="fas fa-times-circle"></i>
-                </div>
-                <div>
-                    <h4 class="mb-1">Analysis Failed</h4>
-                    <p class="text-muted mb-0">Unable to process the ticket</p>
+            <div class="result-header">
+                <div class="d-flex align-items-center">
+                    <div class="result-icon" style="color: var(--danger);">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-1">Analysis Failed</h4>
+                        <p class="text-muted mb-0">Unable to process ticket</p>
+                    </div>
                 </div>
             </div>
             
-            <div class="alert alert-danger border-0 rounded-3">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                ${errorMessage}
+            <div class="result-content">
+                <div class="alert alert-danger border-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${errorMessage}
+                </div>
             </div>
             
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" onclick="resetAnalysis()">
-                    <i class="fas fa-redo me-2"></i>
-                    Try Again
-                </button>
-                <button class="btn btn-outline-secondary" onclick="addMessageToChat('assistant', 'I encountered an issue analyzing your ticket. You can try uploading it again or ask me questions about T&E policies.')">
-                    <i class="fas fa-comments me-2"></i>
-                    Ask Assistant
+            <div class="result-actions">
+                <div></div>
+                <button class="btn btn-primary btn-sm" onclick="resetAnalysis()">
+                    <i class="fas fa-redo me-2"></i>Try Again
                 </button>
             </div>
         </div>
