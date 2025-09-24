@@ -51,6 +51,79 @@ function initializeApp() {
     }
 }
 
+// Ajoutez ce code dans te_main.js, dans la fonction initializeApp()
+
+function initializeApp() {
+    console.log('T&E Chatbot initialized with new interface');
+    
+    // Vérifier si l'utilisateur est connecté
+    if (!document.querySelector('.header-fixed')) {
+        window.location.href = '/';
+        return;
+    }
+    
+    // Focus sur l'input de chat si disponible
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        setTimeout(() => chatInput.focus(), 500);
+    }
+    
+    // Charger l'historique récent si la fonction existe
+    if (typeof loadRecentHistory === 'function') {
+        loadRecentHistory();
+    }
+    
+    // Ajouter le bouton de retour en haut
+    addScrollTopButton();
+    
+    // Gérer le scroll pour afficher/cacher le bouton
+    handleScrollButton();
+}
+
+function addScrollTopButton() {
+    // Créer le bouton de retour en haut s'il n'existe pas déjà
+    if (document.getElementById('scroll-top-btn')) return;
+    
+    const scrollBtn = document.createElement('button');
+    scrollBtn.id = 'scroll-top-btn';
+    scrollBtn.className = 'scroll-top-btn';
+    scrollBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+    scrollBtn.setAttribute('aria-label', 'Retour en haut');
+    scrollBtn.onclick = scrollToTop;
+    
+    document.body.appendChild(scrollBtn);
+}
+
+function handleScrollButton() {
+    const scrollBtn = document.getElementById('scroll-top-btn');
+    if (!scrollBtn) return;
+    
+    window.addEventListener('scroll', function() {
+        if (window.pageYOffset > 300) {
+            scrollBtn.classList.add('show');
+        } else {
+            scrollBtn.classList.remove('show');
+        }
+    });
+}
+
+// Également ajouter cette fonction pour détecter quand l'utilisateur scroll dans la zone principale
+function addScrollDetection() {
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) return;
+    
+    mainContent.addEventListener('scroll', function() {
+        const scrollBtn = document.getElementById('scroll-top-btn');
+        if (scrollBtn) {
+            if (this.scrollTop > 200) {
+                scrollBtn.classList.add('show');
+            } else {
+                scrollBtn.classList.remove('show');
+            }
+        }
+    });
+}
+
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
@@ -81,6 +154,9 @@ function setupEventListeners() {
         });
     }
     
+    // Ajouter la détection de scroll
+    addScrollDetection();
+
     console.log('Event listeners setup complete');
 }
 
@@ -381,7 +457,7 @@ async function analyzeTicket() {
         analyzeBtn.style.pointerEvents = 'none';
     }
     
-    // Afficher la zone de résultats avec loading
+    // Afficher la zone de résultats avec loading SANS scroller
     const resultsSection = document.getElementById('analysis-results');
     if (resultsSection) {
         resultsSection.style.display = 'block';
@@ -438,6 +514,67 @@ async function analyzeTicket() {
     }
 }
 
+
+function showResultNotification(isPass) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${isPass ? 'success' : 'warning'} position-fixed`;
+    notification.style.cssText = `
+        top: 100px; 
+        right: 20px; 
+        z-index: 1050; 
+        min-width: 300px;
+        animation: slideInRight 0.5s ease;
+    `;
+    
+    notification.innerHTML = `
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <i class="fas fa-${isPass ? 'check' : 'exclamation-triangle'} me-2"></i>
+                <strong>Analysis Complete</strong>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" onclick="scrollToResults()">
+                View <i class="fas fa-arrow-down ms-1"></i>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-supprimer après 5 secondes
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function scrollToTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+function scrollToResults() {
+    const resultsSection = document.getElementById('analysis-results');
+    if (resultsSection) {
+        resultsSection.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' // Centrer au lieu de 'nearest'
+        });
+    }
+}
+
+function scrollToUpload() {
+    const uploadArea = document.getElementById('ticket-upload-area');
+    if (uploadArea) {
+        uploadArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
+    }
+}
+
 function displayAnalysisResult(result) {
     const resultsSection = document.getElementById('analysis-results');
     if (!resultsSection) return;
@@ -469,9 +606,18 @@ function displayAnalysisResult(result) {
                 </div>
             </div>
             
+            <!-- Zone de contenu repliable -->
             <div class="analysis-content">
-                <div class="p-3 rounded-3" style="background: rgba(248, 250, 252, 0.8); border-left: 4px solid ${statusColor};">
-                    ${formatAIResponse(analysis.justification)}
+                <button class="btn btn-link p-0 text-start w-100 d-flex align-items-center justify-content-between" 
+                        type="button" data-bs-toggle="collapse" data-bs-target="#analysisDetails">
+                    <span><i class="fas fa-file-alt me-2"></i>View Analysis Details</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                
+                <div class="collapse show" id="analysisDetails">
+                    <div class="p-3 mt-2 rounded-3" style="background: rgba(248, 250, 252, 0.8); border-left: 4px solid ${statusColor}; max-height: 200px; overflow-y: auto;">
+                        ${formatAIResponse(analysis.justification)}
+                    </div>
                 </div>
             </div>
             
@@ -482,18 +628,22 @@ function displayAnalysisResult(result) {
                 </small>
                 <div class="d-flex gap-2">
                     <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
-                        <i class="fas fa-star me-1"></i> Rate Analysis
+                        <i class="fas fa-star me-1"></i> Rate
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" onclick="resetAnalysis()">
-                        <i class="fas fa-redo me-1"></i> New Analysis
+                        <i class="fas fa-redo me-1"></i> New
+                    </button>
+                    <button class="btn btn-outline-info btn-sm" onclick="scrollToTop()">
+                        <i class="fas fa-arrow-up me-1"></i> Top
                     </button>
                 </div>
             </div>
         </div>
     `;
     
-    // Scroll vers les résultats avec animation douce
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // NE PAS faire de scroll automatique - laisser l'utilisateur contrôler
+    // Juste afficher une notification subtile
+    showResultNotification(isPass);
 }
 
 function displayAnalysisError(errorMessage) {
@@ -569,7 +719,11 @@ function resetAnalysis() {
     if (fileInput) {
         fileInput.value = '';
     }
+    
+    // Scroll vers le haut pour voir la zone d'upload
+    scrollToTop();
 }
+
 
 function displaySingleAnalysisResult(result) {
     // Utiliser la nouvelle fonction displayAnalysisResult
