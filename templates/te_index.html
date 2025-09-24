@@ -964,27 +964,33 @@
 
         function setupEventListeners() {
             // File input
-            document.getElementById('ticket-upload').addEventListener('change', function() {
-                if (this.files && this.files[0]) {
-                    handleTicketUpload(this.files[0]);
-                }
-            });
+            const ticketUpload = document.getElementById('ticket-upload');
+            if (ticketUpload) {
+                ticketUpload.addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        handleTicketUpload(this.files[0]);
+                    }
+                });
+            }
 
             // Chat input auto-resize
             const chatInput = document.getElementById('chat-input');
-            chatInput.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-            });
+            if (chatInput) {
+                chatInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+                });
+            }
 
-            // Question input auto-resize
+            // Question input auto-resize  
             const questionInput = document.getElementById('question-input');
-            questionInput.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
-            });
+            if (questionInput) {
+                questionInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+                });
+            }
         }
-
         function setupDragAndDrop() {
             const uploadArea = document.getElementById('ticket-upload-area');
             
@@ -1189,14 +1195,17 @@
             }
             
             currentTicketFile = file;
+            console.log('File uploaded:', file.name);
             
             // Mettre à jour l'interface
             updateUploadUI(file);
             
             // Activer le bouton d'analyse
             const analyzeBtn = document.getElementById('analyze-btn');
-            analyzeBtn.disabled = false;
-            analyzeBtn.classList.remove('disabled');
+            if (analyzeBtn) {
+                analyzeBtn.disabled = false;
+                analyzeBtn.classList.remove('disabled');
+            }
         }
 
         function updateUploadUI(file) {
@@ -1209,7 +1218,7 @@
             uploadIcon.style.color = 'var(--success)';
             
             // Mettre à jour le titre
-            const title = uploadCard.querySelector('h3');
+            const title = uploadCard.querySelector('h4');
             title.textContent = 'File Ready for Analysis';
             
             // Mettre à jour la description

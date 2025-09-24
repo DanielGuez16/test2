@@ -127,12 +127,14 @@ function addScrollDetection() {
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
-    // Upload de ticket
+    // Upload de ticket - CORRECTION ICI
     const ticketUpload = document.getElementById('ticket-upload');
     if (ticketUpload) {
-        // Supprimer les anciens listeners pour éviter les doublons
-        ticketUpload.removeEventListener('change', handleTicketFileSelect);
-        ticketUpload.addEventListener('change', handleTicketFileSelect);
+        ticketUpload.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                handleTicketUpload(this.files[0]);
+            }
+        });
     }
     
     // Chat input avec auto-resize
@@ -1931,15 +1933,6 @@ window.viewWordDocument = async function(){
     modal.show();
   }
 };
-
-
-// Fonction manquante pour gérer la sélection de fichier ticket
-function handleTicketFileSelect() {
-    const fileInput = document.getElementById('ticket-upload');
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-        handleTicketUpload(fileInput.files[0]);
-    }
-}
 
 // Debug: Log des événements pour diagnostiquer les problèmes
 function debugEventListeners() {
