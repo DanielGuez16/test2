@@ -667,18 +667,12 @@ async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: 
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    try:
-        # Utiliser la nouvelle fonction corrigée
-        logs = get_logs(limit)
-        return {
-            "success": True,
-            "logs": logs,
-            "total": len(logs)
-        }
-    except Exception as e:
-        logger.error(f"Erreur récupération logs: {e}")
-        raise HTTPException(status_code=500, detail=f"Error loading logs: {str(e)}")
-
+    logs = get_logs(limit)  # Fonction simple du projet qui marche
+    return {
+        "success": True,
+        "logs": logs,
+        "total": len(logs)
+    }
 
 @app.get("/api/users")
 async def get_users_list(session_token: Optional[str] = Cookie(None)):

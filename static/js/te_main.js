@@ -1242,113 +1242,50 @@ async function loadAdminLogs() {
     if (!logsDiv) return;
     
     try {
-        logsDiv.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p>Loading logs...</p></div>`;
-        
-        const response = await fetch('/api/logs?limit=100');
+        const response = await fetch('/api/logs?limit=50');
         const result = await response.json();
         
-        if (result.success && result.logs && Array.isArray(result.logs)) {
-            // Vérifier que nous avons des logs
+        if (result.success) {
             if (result.logs.length === 0) {
-                logsDiv.innerHTML = `
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        No activity logs found
-                    </div>
-                `;
+                logsDiv.innerHTML = '<div class="alert alert-info">No activity logs found</div>';
                 return;
             }
             
-            // Créer les stats
-            const uniqueUsers = [...new Set(result.logs.map(log => log.username))];
-            const uniqueActions = [...new Set(result.logs.map(log => log.action))];
-            
-            logsDiv.innerHTML = `
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body text-center">
-                                <h4>${result.logs.length}</h4>
-                                <p class="mb-0">Total Logs</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-info text-white">
-                            <div class="card-body text-center">
-                                <h4>${uniqueUsers.length}</h4>
-                                <p class="mb-0">Active Users</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-success text-white">
-                            <div class="card-body text-center">
-                                <h4>${uniqueActions.length}</h4>
-                                <p class="mb-0">Action Types</p>
-                            </div>
-                        </div>
-                    </div>
+            let html = `
+                <div class="mb-3">
+                    <h6>Recent Activity Logs (${result.logs.length})</h6>
                 </div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6>Recent Activity Logs</h6>
-                    <button class="btn btn-sm btn-outline-danger" onclick="clearAllLogs()">
-                        <i class="fas fa-trash me-1"></i> Clear All Logs
-                    </button>
-                </div>
-                
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead class="table-dark">
+                    <table class="table table-striped table-sm">
+                        <thead>
                             <tr>
-                                <th style="width: 150px;">Time</th>
-                                <th style="width: 120px;">User</th>
-                                <th style="width: 100px;">Action</th>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Action</th>
                                 <th>Details</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${result.logs.map(log => {
-                                // Assurer que les propriétés existent
-                                const timestamp = log.timestamp || 'Unknown';
-                                const username = log.username || 'Unknown';
-                                const action = log.action || 'Unknown';
-                                const details = log.details || '';
-                                
-                                return `
-                                    <tr>
-                                        <td><small>${formatDateTime(timestamp)}</small></td>
-                                        <td><small class="text-primary fw-bold">${escapeHtml(username)}</small></td>
-                                        <td><span class="badge bg-secondary">${escapeHtml(action)}</span></td>
-                                        <td><small class="text-muted">${escapeHtml(details)}</small></td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="text-muted text-center mt-3">
-                    <small>
-                        <i class="fas fa-info-circle me-1"></i>
-                        Showing ${result.logs.length} most recent logs
-                    </small>
-                </div>
             `;
-        } else {
-            throw new Error('Invalid response format or no logs data');
+            
+            result.logs.reverse().forEach(log => {
+                html += `
+                    <tr>
+                        <td><small>${new Date(log.timestamp).toLocaleString()}</small></td>
+                        <td><span class="badge bg-primary">${log.username.split('@')[0]}</span></td>
+                        <td><strong>${log.action}</strong></td>
+                        <td><small>${log.details}</small></td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            logsDiv.innerHTML = html;
         }
         
     } catch (error) {
-        console.error('Error loading admin logs:', error);
-        logsDiv.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Error loading logs: ${error.message}
-                <br><small>Check console for details</small>
-            </div>
-        `;
+        console.error('Error loading logs:', error);
+        logsDiv.innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
     }
 }
 

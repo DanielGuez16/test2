@@ -63,60 +63,71 @@ def get_sharepoint_client():
     return SharePointClient()
 
 def log_activity(username: str, action: str, details: str = ""):
-    """Enregistre une activité utilisateur - LOGS SEULEMENT"""
+    """Enregistre une activité utilisateur dans SharePoint Excel"""
     log_entry = {
         "timestamp": datetime.now().isoformat(),
         "username": username,
         "action": action,
-        "details": details,
-        "type": "activity_log"  # Identificateur pour éviter les mélanges
+        "details": details
     }
     
     try:
         client = get_sharepoint_client()
         
-        # Lire le fichier existant ou créer un nouveau DataFrame
+        # Tenter de lire le fichier existant
         try:
             binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
             existing_data = client.read_excel_file_as_dict(binary_content)
             logs_df = pd.DataFrame(existing_data)
-            
-            # Vérifier que les colonnes existent
-            required_columns = ["timestamp", "username", "action", "details"]
-            for col in required_columns:
-                if col not in logs_df.columns:
-                    logs_df[col] = ""
-                    
-        except Exception as e:
-            print(f"Création nouveau fichier de logs: {e}")
+        except:
+            # Si le fichier n'existe pas, créer un DataFrame vide
             logs_df = pd.DataFrame(columns=["timestamp", "username", "action", "details"])
         
         # Ajouter le nouveau log
-        new_log_df = pd.DataFrame([{
-            "timestamp": log_entry["timestamp"],
-            "username": log_entry["username"],
-            "action": log_entry["action"],
-            "details": log_entry["details"]
-        }])
-        
-        # CORRECTION: Utiliser pd.concat au lieu d'append (deprecated)
+        new_log_df = pd.DataFrame([log_entry])
         logs_df = pd.concat([logs_df, new_log_df], ignore_index=True)
         
-        # Garder seulement les colonnes nécessaires
-        logs_df = logs_df[["timestamp", "username", "action", "details"]]
-        
-        # Limiter à 2000 logs maximum pour la performance
-        if len(logs_df) > 2000:
-            logs_df = logs_df.tail(2000)
+        # Limiter à 1000 logs maximum
+        if len(logs_df) > 1000:
+            logs_df = logs_df.tail(1000)
         
         # Sauvegarder dans SharePoint
         client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH, False)
-        print(f"✓ LOG ACTIVITY: {username} - {action}")
+        
+        print(f"LOG: {username} - {action} - {details}")
         
     except Exception as e:
         print(f"ERREUR sauvegarde log SharePoint: {e}")
-        # Fallback vers le fichier local
-        _save_to_local_file(log_entry, LOGS_FILE)
+        # Fallback vers le fichier local en cas d'erreur SharePoint
+        _log_activity_fallback(username, action, details)
+
+def _log_activity_fallback(username: str, action: str, details: str = ""):
+    """Sauvegarde locale de secours en cas d'erreur SharePoint"""
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "username": username,
+        "action": action,
+        "details": details
+    }
+    
+    logs = []
+    if os.path.exists(LOGS_FILE):
+        try:
+            with open(LOGS_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except:
+            logs = []
+    
+    logs.append(log_entry)
+    if len(logs) > 1000:
+        logs = logs[-1000:]
+    
+    try:
+        with open(LOGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"ERREUR sauvegarde fallback: {e}")
+
 
 def save_analysis_to_sharepoint(analysis_record: dict):
     """Sauvegarde l'analyse dans SharePoint - ANALYSES SEULEMENT"""
