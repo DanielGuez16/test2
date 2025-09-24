@@ -168,18 +168,21 @@ class TicketAnalyzer:
         try:
             # Construire le prompt d'extraction
             extraction_prompt = f"""
-            Parse this ticket and extract/deduct the following information in JSON format :
+            Parse this ticket and extract information in VALID JSON format with double quotes only:
             {{
-                "amount": float or null,
-                "currency": "EUR/USD/etc" or null,
-                "category": "hotel/meal/transport/flight" or "unknown",
-                "subcategory": "breakfast/lunch/dinner/accommodation" or null,
-                "date": "YYYY-MM-DD" or null,
-                "vendor": "name of vendor/trader/shop" or null,
-                "location": "country/city" or null,
-                "country_code": "FR/US/etc" or null,
-                "confidence": float between 0 and 1
+                "amount": 57.0,
+                "currency": "EUR", 
+                "category": "meal",
+                "subcategory": "dinner",
+                "date": "2025-09-12",
+                "vendor": "pizzeria",
+                "location": "Rome", 
+                "country_code": "IT",
+                "confidence": 0.8
             }}
+
+            IMPORTANT: Use double quotes for strings, not single quotes.
+            Return ONLY the JSON, no extra text.
             
             Ticket to analyze :
             {raw_text[:2000]}
@@ -238,27 +241,39 @@ class TicketAnalyzer:
         info = {
             "amount": None,
             "currency": None,
-            "category": "unknown",
+            "category": "unknown", 
+            "subcategory": None,
+            "date": None,
+            "vendor": None,
+            "location": None,
+            "country_code": None,
             "confidence": 0.5
         }
         
-        # Extraire montant avec regex
-        amount_match = re.search(r'"amount":\s*([0-9.]+)', ai_response)
-        if amount_match:
-            try:
-                info["amount"] = float(amount_match.group(1))
-            except ValueError:
-                pass
+        # Extraire tous les champs avec regex
+        patterns = {
+            "amount": r'"amount":\s*([0-9.]+)',
+            "currency": r'"currency":\s*[\'"]([A-Z]{3})[\'"]',
+            "category": r'"category":\s*[\'"]([^\'",]+)[\'"]',
+            "subcategory": r'"subcategory":\s*[\'"]([^\'",]+)[\'"]',
+            "date": r'"date":\s*[\'"]([^\'",]+)[\'"]', 
+            "vendor": r'"vendor":\s*[\'"]([^\'",]+)[\'"]',
+            "location": r'"location":\s*[\'"]([^\'",]+)[\'"]',
+            "country_code": r'"country_code":\s*[\'"]([^\'",]+)[\'"]',
+            "confidence": r'"confidence":\s*[\'"]?([0-9.]+)[\'"]?'
+        }
         
-        # Extraire devise
-        currency_match = re.search(r'"currency":\s*"([A-Z]{3})"', ai_response)
-        if currency_match:
-            info["currency"] = currency_match.group(1)
-        
-        # Extraire catégorie
-        category_match = re.search(r'"category":\s*"([^"]+)"', ai_response)
-        if category_match:
-            info["category"] = category_match.group(1)
+        for field, pattern in patterns.items():
+            match = re.search(pattern, ai_response)
+            if match:
+                value = match.group(1)
+                if field in ["amount", "confidence"]:
+                    try:
+                        info[field] = float(value)
+                    except ValueError:
+                        pass
+                else:
+                    info[field] = value
         
         return info
 
