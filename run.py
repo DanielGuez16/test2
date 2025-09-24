@@ -47,7 +47,7 @@ rag_system = TERAGSystem()
 # Imports internes
 from llm_connector import LLMConnector
 from te_document_processor import TEDocumentProcessor
-from user_management import authenticate_user, log_activity, get_logs, USERS_DB
+from user_management import authenticate_user, log_activity, get_logs, USERS_DB, authenticate_user, get_analysis_history, get_feedback_stats, save_analysis_to_sharepoint, save_feedback_to_sharepoint
 
 from sharepoint_connector import SharePointClient
 from embedding_connector import EMBEDDINGConnector
@@ -428,6 +428,7 @@ async def view_word_document(session_token: Optional[str] = Cookie(None)):
         logger.error(f"Erreur visualisation Word: {e}")
         raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
     
+
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
     ticket_file: UploadFile = File(...),
@@ -470,7 +471,7 @@ async def analyze_ticket(
         # 4. Analyse avec les règles
         analysis_result = analyzer.analyze_ticket(ticket_info, te_documents, question)
 
-        # 5. Préparer la réponse AVANT de sauvegarder
+        # 5. Préparer la réponse
         response_data = {
             "success": True,
             "ticket_info": ticket_info,
@@ -478,7 +479,7 @@ async def analyze_ticket(
             "timestamp": datetime.now().isoformat()
         }
         
-        # 6. Sauvegarder UNE SEULE FOIS ici
+        # 6. Sauvegarder l'analyse - CORRECTION ICI
         analysis_record = {
             "timestamp": response_data["timestamp"],
             "user": current_user["username"],
@@ -488,7 +489,7 @@ async def analyze_ticket(
             "question": question
         }
         
-        chatbot_session["analysis_history"].append(analysis_record)
+        # Sauvegarder dans SharePoint (nouvelle fonction séparée)
         try:
             save_analysis_to_sharepoint(analysis_record)
         except Exception as e:
@@ -499,7 +500,8 @@ async def analyze_ticket(
     except Exception as e:
         logger.error(f"Erreur analyse ticket: {e}")
         raise HTTPException(status_code=500, detail=f"Error analyzing ticket: {str(e)}")
-    
+
+
 @app.post("/api/chat")
 async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
@@ -559,18 +561,19 @@ async def submit_feedback(
             "timestamp": datetime.now().isoformat(),
             "user": current_user["username"],
             "analysis_id": data.get("analysis_id", ""),
-            "rating": data.get("rating", 0),
+            "rating": int(data.get("rating", 0)),
             "comment": data.get("comment", ""),
             "issue_type": data.get("issue_type", "")
         }
         
-        # Sauvegarder en CSV local
-        save_feedback_to_csv(feedback_record)
+        # CORRECTION: Sauvegarder dans SharePoint (plus en local CSV)
+        try:
+            save_feedback_to_sharepoint(feedback_record)
+        except Exception as e:
+            logger.warning(f"Erreur sauvegarde feedback SharePoint: {e}")
         
-        # Ajouter à la session
-        chatbot_session["feedback_data"].append(feedback_record)
-        
-        log_activity(current_user["username"], "FEEDBACK", f"Rating: {feedback_record['rating']}, Issue: {feedback_record['issue_type']}")
+        log_activity(current_user["username"], "FEEDBACK", 
+                    f"Rating: {feedback_record['rating']}, Issue: {feedback_record['issue_type']}")
         
         return {
             "success": True,
@@ -581,27 +584,35 @@ async def submit_feedback(
         logger.error(f"Erreur feedback: {e}")
         raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
 
+
 @app.get("/api/analysis-history")
-async def get_analysis_history(session_token: Optional[str] = Cookie(None)):
+async def get_analysis_history_api(session_token: Optional[str] = Cookie(None)):
     """Récupère l'historique des analyses"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Filtrer par utilisateur si non admin
-    if current_user["role"] == "admin":
-        history = chatbot_session["analysis_history"]
-    else:
-        history = [
-            record for record in chatbot_session["analysis_history"]
-            if record.get("user") == current_user["username"]
-        ]
-    
-    return {
-        "success": True,
-        "history": history[-20:],  # Derniers 20 enregistrements
-        "total": len(history)
-    }
+    try:
+        # Récupérer depuis SharePoint via la nouvelle fonction
+        history = get_analysis_history(limit=50)
+        
+        # Filtrer par utilisateur si non admin
+        if current_user["role"] != "admin":
+            history = [
+                record for record in history
+                if record.get("user") == current_user["username"]
+            ]
+        
+        return {
+            "success": True,
+            "history": history,
+            "total": len(history)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur récupération historique: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading history: {str(e)}")
+
 
 @app.get("/api/te-status")
 async def get_te_status():
@@ -656,12 +667,18 @@ async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: 
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    logs = get_logs(limit)
-    return {
-        "success": True,
-        "logs": logs,
-        "total": len(logs)
-    }
+    try:
+        # Utiliser la nouvelle fonction corrigée
+        logs = get_logs(limit)
+        return {
+            "success": True,
+            "logs": logs,
+            "total": len(logs)
+        }
+    except Exception as e:
+        logger.error(f"Erreur récupération logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading logs: {str(e)}")
+
 
 @app.get("/api/users")
 async def get_users_list(session_token: Optional[str] = Cookie(None)):
@@ -688,7 +705,7 @@ async def get_users_list(session_token: Optional[str] = Cookie(None)):
     }
 
 @app.get("/api/feedback-stats")
-async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
+async def get_feedback_stats_api(session_token: Optional[str] = Cookie(None)):
     """Statistiques sur les feedbacks (admins seulement)"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
@@ -698,39 +715,8 @@ async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
-        import csv
-        import os
-        
-        feedback_file = "data/feedback.csv"
-        stats = {
-            "total_feedback": 0,
-            "average_rating": 0.0,
-            "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-            "common_issues": {}
-        }
-        
-        if os.path.exists(feedback_file):
-            with open(feedback_file, 'r', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                ratings = []
-                
-                for row in reader:
-                    stats["total_feedback"] += 1
-                    
-                    # Rating distribution
-                    rating = int(row.get('rating', 0))
-                    if 1 <= rating <= 5:
-                        stats["rating_distribution"][rating] += 1
-                        ratings.append(rating)
-                    
-                    # Common issues
-                    issue_type = row.get('issue_type', 'unknown')
-                    stats["common_issues"][issue_type] = stats["common_issues"].get(issue_type, 0) + 1
-                
-                # Average rating
-                if ratings:
-                    stats["average_rating"] = round(sum(ratings) / len(ratings), 2)
-        
+        # Utiliser la nouvelle fonction depuis SharePoint
+        stats = get_feedback_stats()
         return {
             "success": True,
             "stats": stats
@@ -743,31 +729,36 @@ async def get_feedback_stats(session_token: Optional[str] = Cookie(None)):
             "error": str(e)
         }
 
-# Fonction utilitaire pour sauvegarder feedback
-def save_feedback_to_csv(feedback_record: dict):
-    """Sauvegarde le feedback dans un fichier CSV local"""
+@app.post("/api/clear-logs")
+async def clear_all_logs_api(session_token: Optional[str] = Cookie(None)):
+    """Nettoie tous les logs - ADMIN SEULEMENT"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     try:
-        import csv
-        import os
+        from user_management import clear_all_logs
+        success = clear_all_logs()
         
-        feedback_file = "data/feedback.csv"
-        
-        # Créer le header si le fichier n'existe pas
-        file_exists = os.path.exists(feedback_file)
-        
-        with open(feedback_file, mode='a', newline='', encoding='utf-8') as file:
-            fieldnames = ['timestamp', 'user', 'analysis_id', 'rating', 'comment', 'issue_type']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
+        if success:
+            log_activity(current_user["username"], "CLEAR_LOGS", "Nettoyage complet des logs")
+            return {
+                "success": True,
+                "message": "Tous les logs ont été nettoyés"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Erreur lors du nettoyage des logs"
+            }
             
-            if not file_exists:
-                writer.writeheader()
-            
-            writer.writerow(feedback_record)
-        
-        logger.info(f"Feedback sauvegardé: {feedback_record['rating']}/5")
-        
     except Exception as e:
-        logger.error(f"Erreur sauvegarde feedback: {e}")
+        logger.error(f"Erreur nettoyage logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Error clearing logs: {str(e)}")
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -815,52 +806,8 @@ def preprocess_image_for_ocr(image):
     except Exception as e:
         logger.warning(f"Erreur preprocessing: {e}")
         return image
-    
-def save_analysis_to_sharepoint(analysis_record: dict):
-    """Sauvegarde l'analyse dans SharePoint pour persistance"""
-    try:
-        from user_management import get_sharepoint_client
-        import pandas as pd
-        
-        client = get_sharepoint_client()
-        analysis_path = "Chatbot/logs/analysis_history.xlsx"
-        
-        # Aplatir les données pour Excel
-        flat_record = {
-            "timestamp": analysis_record["timestamp"],
-            "user": analysis_record["user"],
-            "ticket_filename": analysis_record["ticket_filename"],
-            "question": analysis_record["question"],
-            "result": analysis_record["analysis_result"]["result"],
-            "expense_type": analysis_record["analysis_result"]["expense_type"],
-            "amount": analysis_record["ticket_info"].get("amount"),
-            "currency": analysis_record["ticket_info"].get("currency"),
-            "vendor": analysis_record["ticket_info"].get("vendor"),
-            "confidence": analysis_record["ticket_info"].get("confidence")
-        }
-        
-        # Lire existant ou créer nouveau
-        try:
-            binary_content = client.read_binary_file(analysis_path)
-            existing_data = client.read_excel_file_as_dict(binary_content)
-            df = pd.DataFrame(existing_data)
-        except:
-            df = pd.DataFrame()
-        
-        # Ajouter nouvelle ligne
-        new_df = pd.DataFrame([flat_record])
-        df = pd.concat([df, new_df], ignore_index=True)
-        
-        # Limiter à 1000 analyses
-        if len(df) > 1000:
-            df = df.tail(1000)
-            
-        # Sauvegarder
-        client.save_dataframe_in_sharepoint(df, analysis_path, False)
-        
-    except Exception as e:
-        logger.error(f"Erreur sauvegarde analyse SharePoint: {e}")
-    
+
+
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
     """Extrait SEULEMENT le texte brut du ticket - AUCUNE analyse"""
     try:

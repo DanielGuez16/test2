@@ -1068,62 +1068,6 @@ function showHistory() {
     }
 }
 
-
-// Ce qui devrait être implémenté
-async function loadFullHistory() {
-    const historyDiv = document.getElementById('full-history');
-    if (!historyDiv) return;
-    
-    try {
-        const response = await fetch('/api/analysis-history');
-        const result = await response.json();
-        
-        if (result.success && result.history.length > 0) {
-            historyDiv.innerHTML = result.history.map(item => `
-                <div class="history-item border-bottom py-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="mb-1">
-                                <i class="fas fa-file me-2"></i>${item.ticket_filename}
-                            </h6>
-                            <p class="mb-1 text-muted">${item.question || 'No specific question'}</p>
-                            <small class="text-muted">
-                                <i class="fas fa-user me-1"></i>${item.user} • 
-                                <i class="fas fa-clock me-1"></i>${formatDateTime(item.timestamp)}
-                            </small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-${item.analysis_result.result === 'PASS' ? 'success' : 'warning'} mb-2">
-                                ${item.analysis_result.result}
-                            </span>
-                            <br>
-                            <small class="text-muted">
-                                ${item.ticket_info.amount ? `${item.ticket_info.amount} ${item.ticket_info.currency || ''}` : 'N/A'}
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            historyDiv.innerHTML = `
-                <div class="text-center text-muted p-4">
-                    <i class="fas fa-inbox fa-2x mb-3"></i>
-                    <p>No analysis history found</p>
-                </div>
-            `;
-        }
-        
-    } catch (error) {
-        console.error('Error loading history:', error);
-        historyDiv.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Error loading history
-            </div>
-        `;
-    }
-}
-
 async function loadRecentHistory() {
     const recentDiv = document.getElementById('recent-history');
     if (!recentDiv) return;
@@ -1292,44 +1236,119 @@ function showAdminPanel() {
     }
 }
 
+
 async function loadAdminLogs() {
     const logsDiv = document.getElementById('admin-logs');
     if (!logsDiv) return;
     
     try {
-        const response = await fetch('/api/logs');
+        logsDiv.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p>Loading logs...</p></div>`;
+        
+        const response = await fetch('/api/logs?limit=100');
         const result = await response.json();
         
-        if (result.success) {
+        if (result.success && result.logs && Array.isArray(result.logs)) {
+            // Vérifier que nous avons des logs
+            if (result.logs.length === 0) {
+                logsDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No activity logs found
+                    </div>
+                `;
+                return;
+            }
+            
+            // Créer les stats
+            const uniqueUsers = [...new Set(result.logs.map(log => log.username))];
+            const uniqueActions = [...new Set(result.logs.map(log => log.action))];
+            
             logsDiv.innerHTML = `
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h4>${result.logs.length}</h4>
+                                <p class="mb-0">Total Logs</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h4>${uniqueUsers.length}</h4>
+                                <p class="mb-0">Active Users</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h4>${uniqueActions.length}</h4>
+                                <p class="mb-0">Action Types</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6>Recent Activity Logs</h6>
+                    <button class="btn btn-sm btn-outline-danger" onclick="clearAllLogs()">
+                        <i class="fas fa-trash me-1"></i> Clear All Logs
+                    </button>
+                </div>
+                
                 <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
+                    <table class="table table-sm table-hover">
+                        <thead class="table-dark">
                             <tr>
-                                <th>Time</th>
-                                <th>User</th>
-                                <th>Action</th>
+                                <th style="width: 150px;">Time</th>
+                                <th style="width: 120px;">User</th>
+                                <th style="width: 100px;">Action</th>
                                 <th>Details</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${result.logs.slice(-50).reverse().map(log => `
-                                <tr>
-                                    <td><small>${formatDateTime(log.timestamp)}</small></td>
-                                    <td><small>${log.username}</small></td>
-                                    <td><span class="badge bg-secondary">${log.action}</span></td>
-                                    <td><small>${log.details}</small></td>
-                                </tr>
-                            `).join('')}
+                            ${result.logs.map(log => {
+                                // Assurer que les propriétés existent
+                                const timestamp = log.timestamp || 'Unknown';
+                                const username = log.username || 'Unknown';
+                                const action = log.action || 'Unknown';
+                                const details = log.details || '';
+                                
+                                return `
+                                    <tr>
+                                        <td><small>${formatDateTime(timestamp)}</small></td>
+                                        <td><small class="text-primary fw-bold">${escapeHtml(username)}</small></td>
+                                        <td><span class="badge bg-secondary">${escapeHtml(action)}</span></td>
+                                        <td><small class="text-muted">${escapeHtml(details)}</small></td>
+                                    </tr>
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
+                
+                <div class="text-muted text-center mt-3">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        Showing ${result.logs.length} most recent logs
+                    </small>
+                </div>
             `;
+        } else {
+            throw new Error('Invalid response format or no logs data');
         }
         
     } catch (error) {
         console.error('Error loading admin logs:', error);
-        logsDiv.innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
+        logsDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading logs: ${error.message}
+                <br><small>Check console for details</small>
+            </div>
+        `;
     }
 }
 
@@ -1367,76 +1386,264 @@ async function loadAdminUsers() {
     }
 }
 
+async function loadFullHistory() {
+    const historyDiv = document.getElementById('full-history');
+    if (!historyDiv) return;
+    
+    try {
+        historyDiv.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p>Loading analysis history...</p></div>`;
+        
+        const response = await fetch('/api/analysis-history');
+        const result = await response.json();
+        
+        if (result.success && result.history && Array.isArray(result.history)) {
+            if (result.history.length === 0) {
+                historyDiv.innerHTML = `
+                    <div class="text-center text-muted p-4">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <h5>No Analysis History</h5>
+                        <p>No ticket analyses have been performed yet.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            historyDiv.innerHTML = `
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <h6>Analysis History (${result.history.length} analyses)</h6>
+                    <div>
+                        <small class="text-muted">Most recent first</small>
+                    </div>
+                </div>
+                
+                <div class="history-list">
+                    ${result.history.map(item => {
+                        // Vérifier la structure des données
+                        const timestamp = item.timestamp || 'Unknown time';
+                        const user = item.user || 'Unknown user';
+                        const filename = item.ticket_filename || 'Unknown file';
+                        const question = item.question || 'No specific question';
+                        const result_status = item.analysis_result?.result || 'Unknown';
+                        const expense_type = item.analysis_result?.expense_type || 'Unknown type';
+                        const amount = item.ticket_info?.amount || 'N/A';
+                        const currency = item.ticket_info?.currency || '';
+                        
+                        const statusBadgeClass = result_status === 'PASS' ? 'success' : 
+                                               result_status === 'FAIL' ? 'danger' : 'warning';
+                        
+                        return `
+                            <div class="history-item border rounded-3 p-3 mb-3 bg-light">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <i class="fas fa-file-invoice me-2 text-primary"></i>
+                                            ${escapeHtml(filename)}
+                                        </h6>
+                                        <p class="mb-2 text-dark">
+                                            <strong>Question:</strong> ${escapeHtml(question)}
+                                        </p>
+                                        <p class="mb-1 text-muted">
+                                            <strong>Type:</strong> ${escapeHtml(expense_type)}
+                                        </p>
+                                    </div>
+                                    <div class="text-end ms-3">
+                                        <span class="badge bg-${statusBadgeClass} fs-6 mb-2">
+                                            ${result_status}
+                                        </span>
+                                        <br>
+                                        <div class="badge bg-light text-dark">
+                                            ${amount} ${currency}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>${escapeHtml(user)} •
+                                        <i class="fas fa-clock me-1"></i>${formatDateTime(timestamp)}
+                                    </small>
+                                    <small class="text-muted">
+                                        Analysis #${result.history.indexOf(item) + 1}
+                                    </small>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+        } else {
+            throw new Error('Invalid response format or no history data');
+        }
+        
+    } catch (error) {
+        console.error('Error loading analysis history:', error);
+        historyDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading analysis history: ${error.message}
+                <br><small>Check console for details</small>
+            </div>
+        `;
+    }
+}
+
 async function loadAdminFeedback() {
     const feedbackDiv = document.getElementById('admin-feedback');
     if (!feedbackDiv) return;
     
     try {
+        feedbackDiv.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p>Loading feedback data...</p></div>`;
+        
         const response = await fetch('/api/feedback-stats');
         const result = await response.json();
         
-        if (result.success) {
+        if (result.success && result.stats) {
             const stats = result.stats;
+            
+            if (stats.total_feedback === 0) {
+                feedbackDiv.innerHTML = `
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-star fa-2x mb-3"></i>
+                        <h5>No Feedback Yet</h5>
+                        <p class="mb-0">No user feedback has been submitted.</p>
+                    </div>
+                `;
+                return;
+            }
+            
             feedbackDiv.innerHTML = `
-                <div class="row">
+                <div class="row mb-4">
                     <div class="col-md-4">
-                        <div class="card bg-light">
+                        <div class="card bg-primary text-white">
                             <div class="card-body text-center">
-                                <h4>${stats.total_feedback}</h4>
-                                <p class="mb-0">Total Feedback</p>
+                                <h3>${stats.total_feedback}</h3>
+                                <p class="mb-0">Total Feedbacks</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card bg-light">
+                        <div class="card bg-success text-white">
                             <div class="card-body text-center">
-                                <h4>${stats.average_rating}/5</h4>
+                                <h3>${stats.average_rating}<small>/5</small></h3>
                                 <p class="mb-0">Average Rating</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <h6>Rating Distribution:</h6>
-                                ${Object.entries(stats.rating_distribution).map(([rating, count]) => 
-                                    `<div>★${rating}: ${count}</div>`
-                                ).join('')}
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <div class="d-flex justify-content-center align-items-center">
+                                    ${[1,2,3,4,5].map(star => 
+                                        `<i class="fas fa-star me-1 ${star <= Math.round(stats.average_rating) ? '' : 'opacity-50'}"></i>`
+                                    ).join('')}
+                                </div>
+                                <p class="mb-0 mt-2">User Satisfaction</p>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                ${stats.common_issues && Object.keys(stats.common_issues).length > 0 ? `
-                <div class="mt-3">
-                    <h6>Common Issues:</h6>
-                    <div class="row">
-                        ${Object.entries(stats.common_issues).slice(0, 5).map(([issue, count]) => `
-                            <div class="col-md-6 mb-2">
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-truncate">${issue}</span>
-                                    <span class="badge bg-warning">${count}</span>
-                                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Rating Distribution</h6>
                             </div>
-                        `).join('')}
+                            <div class="card-body">
+                                ${Object.entries(stats.rating_distribution).map(([rating, count]) => {
+                                    const percentage = stats.total_feedback > 0 ? Math.round((count / stats.total_feedback) * 100) : 0;
+                                    return `
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span>
+                                                ${[...Array(parseInt(rating))].map(() => '⭐').join('')}
+                                                ${rating} star${rating > 1 ? 's' : ''}
+                                            </span>
+                                            <div class="flex-grow-1 mx-3">
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar" style="width: ${percentage}%"></div>
+                                                </div>
+                                            </div>
+                                            <span class="badge bg-secondary">${count}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Common Issues</h6>
+                            </div>
+                            <div class="card-body">
+                                ${Object.keys(stats.common_issues).length > 0 ? 
+                                    Object.entries(stats.common_issues).slice(0, 5).map(([issue, count]) => `
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-truncate flex-grow-1 me-2">${escapeHtml(issue)}</span>
+                                            <span class="badge bg-warning">${count}</span>
+                                        </div>
+                                    `).join('') 
+                                    : 
+                                    '<div class="text-muted text-center">No issues reported</div>'
+                                }
+                            </div>
+                        </div>
                     </div>
                 </div>
-                ` : ''}
             `;
+            
         } else {
-            feedbackDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    No feedback data available yet
-                </div>
-            `;
+            throw new Error(result.error || 'Invalid response format');
         }
         
     } catch (error) {
-        console.error('Error loading admin feedback:', error);
-        feedbackDiv.innerHTML = '<div class="alert alert-danger">Error loading feedback</div>';
+        console.error('Error loading feedback stats:', error);
+        feedbackDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading feedback data: ${error.message}
+            </div>
+        `;
     }
 }
+
+async function clearAllLogs() {
+    if (!confirm('⚠️ WARNING: This will permanently delete ALL logs, analysis history, and feedback data.\n\nThis action cannot be undone. Are you sure?')) {
+        return;
+    }
+    
+    if (!confirm('This is your final warning. All data will be lost. Continue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/clear-logs', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ All logs have been cleared successfully');
+            
+            // Recharger les données admin
+            setTimeout(() => {
+                loadAdminLogs();
+                loadAdminFeedback();
+            }, 500);
+            
+        } else {
+            throw new Error(result.message || 'Failed to clear logs');
+        }
+        
+    } catch (error) {
+        console.error('Error clearing logs:', error);
+        alert('❌ Error clearing logs: ' + error.message);
+    }
+}
+
 
 // ===== VISUALISATION DES DOCUMENTS =====
 
@@ -1755,8 +1962,12 @@ async function logout() {
 // ===== UTILITAIRES =====
 
 function escapeHtml(text) {
+    if (text === null || text === undefined) {
+        return '';
+    }
+    
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
 }
 
@@ -1786,16 +1997,26 @@ function formatFileSize(bytes) {
 
 function formatDateTime(isoString) {
     try {
+        if (!isoString) return 'Unknown time';
+        
         const date = new Date(isoString);
+        
+        // Vérifier si la date est valide
+        if (isNaN(date.getTime())) {
+            return isoString.substring(0, 16);
+        }
+        
         return date.toLocaleString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: true
         });
     } catch (error) {
-        return isoString.substring(0, 16);
+        console.warn('Error formatting date:', isoString, error);
+        return isoString ? String(isoString).substring(0, 16) : 'Invalid date';
     }
 }
 
@@ -2014,6 +2235,33 @@ function escapeHtml(s){
     });
   }
 })();
+
+async function debugAPIs() {
+    console.log('=== DEBUG APIs ===');
+    
+    try {
+        console.log('Testing /api/logs...');
+        const logsResponse = await fetch('/api/logs?limit=5');
+        const logsData = await logsResponse.json();
+        console.log('Logs API:', logsData);
+        
+        console.log('Testing /api/analysis-history...');
+        const historyResponse = await fetch('/api/analysis-history');
+        const historyData = await historyResponse.json();
+        console.log('History API:', historyData);
+        
+        console.log('Testing /api/feedback-stats...');
+        const feedbackResponse = await fetch('/api/feedback-stats');
+        const feedbackData = await feedbackResponse.json();
+        console.log('Feedback API:', feedbackData);
+        
+    } catch (error) {
+        console.error('Error testing APIs:', error);
+    }
+}
+
+window.debugAPIs = debugAPIs;
+window.clearAllLogs = clearAllLogs;
 
 // ===== FONCTIONS GLOBALES POUR LES ONCLICK =====
 
