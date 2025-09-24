@@ -104,65 +104,6 @@ function setupEventListeners() {
     console.log('Event listeners setup complete');
 }
 
-function setupDragAndDrop() {
-    // Zone upload ticket
-    const ticketUploadArea = document.getElementById('ticket-upload-area');
-    if (ticketUploadArea) {
-        ticketUploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('drag-over');
-        });
-        
-        ticketUploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-        });
-        
-        ticketUploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleTicketUpload(files[0]);
-            }
-        });
-    }
-    
-    // Zones upload documents T&E
-    const uploadAreas = document.querySelectorAll('.upload-area');
-    uploadAreas.forEach(area => {
-        area.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('drag-over');
-        });
-        
-        area.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-        });
-        
-        area.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                // Déterminer le type basé sur l'ID du parent
-                const isExcel = this.closest('.col-md-6').querySelector('#excel-file') !== null;
-                const targetInput = isExcel ? document.getElementById('excel-file') : document.getElementById('word-file');
-                
-                // Simuler la sélection de fichier
-                const dt = new DataTransfer();
-                dt.items.add(files[0]);
-                targetInput.files = dt.files;
-                
-                handleDocumentSelect(targetInput, isExcel ? 'excel' : 'word');
-            }
-        });
-    });
-}
-
 function setupRatingStars() {
     const stars = document.querySelectorAll('#rating-stars .star');
     stars.forEach(star => {
@@ -387,23 +328,31 @@ async function analyzeTicket() {
         return;
     }
     
-    // Afficher immédiatement la jauge de chargement
+    console.log('Starting ticket analysis...'); // Debug
+    
+    // Afficher immédiatement la jauge de chargement améliorée
     const container = document.getElementById('ticket-status');
     container.innerHTML = `
-        <div class="alert alert-info">
-            <div class="d-flex align-items-center">
-                <div class="spinner-border spinner-border-sm me-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
+        <div class="alert alert-info analysis-loading">
+            <div class="d-flex align-items-center mb-2">
+                <div class="spinner-custom me-3"></div>
                 <div>
-                    <strong>Analyzing ticket...</strong><br>
-                    <small>Processing ${currentTicketFile.name} with AI engine</small>
+                    <h6 class="mb-1">Analyzing Ticket...</h6>
+                    <small class="text-muted">Processing ${currentTicketFile.name}</small>
                 </div>
             </div>
-            <div class="progress mt-2" style="height: 4px;">
-                <div class="progress-bar progress-bar-animated" 
-                     style="width: 100%; background-color: var(--natixis-blue);">
+            
+            <div class="progress" style="height: 6px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                     style="width: 100%; transition: width 2s ease;">
                 </div>
+            </div>
+            
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-cog fa-spin me-1"></i>
+                    AI engine processing document content...
+                </small>
             </div>
         </div>
     `;
@@ -411,27 +360,36 @@ async function analyzeTicket() {
     // Désactiver le bouton pendant l'analyse
     const analyzeBtn = document.getElementById('analyze-btn');
     const originalText = analyzeBtn.innerHTML;
+    const originalDisabled = analyzeBtn.disabled;
+    
     analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
     analyzeBtn.disabled = true;
-    
-    const formData = new FormData();
-    formData.append('ticket_file', currentTicketFile);
-    
-    const question = document.getElementById('question-input').value;
-    formData.append('question', question);
+    analyzeBtn.style.pointerEvents = 'none'; // Empêcher les double-clics
     
     try {
+        const formData = new FormData();
+        formData.append('ticket_file', currentTicketFile);
+        
+        const question = document.getElementById('question-input').value;
+        formData.append('question', question);
+        
+        console.log('Sending request to API...'); // Debug
+        
         const response = await fetch('/api/analyze-ticket', {
             method: 'POST',
             body: formData
         });
 
         const data = await response.json();
+        
+        console.log('API response received:', data.success); // Debug
+        
         if (data.success) {
             displaySingleAnalysisResult(data); 
         } else {
             container.innerHTML = `
                 <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
                     <strong>Analysis Failed:</strong> ${data.detail || 'Unknown error'}
                 </div>
             `;
@@ -441,13 +399,18 @@ async function analyzeTicket() {
         console.error('Erreur analyse:', error);
         container.innerHTML = `
             <div class="alert alert-danger">
-                <strong>Error during analysis:</strong> ${error.message}
+                <i class="fas fa-times-circle me-2"></i>
+                <strong>Error:</strong> ${error.message}
             </div>
         `;
     } finally {
-        // Restaurer le bouton
-        analyzeBtn.innerHTML = originalText;
-        analyzeBtn.disabled = false;
+        // Restaurer le bouton avec un délai pour éviter les double-clics
+        setTimeout(() => {
+            analyzeBtn.innerHTML = originalText;
+            analyzeBtn.disabled = originalDisabled;
+            analyzeBtn.style.pointerEvents = 'auto';
+            console.log('Analysis button restored'); // Debug
+        }, 500);
     }
 }
 
@@ -472,26 +435,34 @@ function displaySingleAnalysisResult(result) {
     const statusIcon = isPass ? 'check-circle' : 'exclamation-triangle';
     
     container.innerHTML = `
-        <div class="alert alert-${statusClass}">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <h6 class="mb-0">
-                    <i class="fas fa-${statusIcon} me-2"></i>
-                    Analysis Result: ${analysis.result}
-                </h6>
-                <span class="badge bg-${statusClass}">${analysis.expense_type}</span>
+        <div class="alert alert-${statusClass} analysis-result">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="mb-1">
+                        <i class="fas fa-${statusIcon} me-2"></i>
+                        ${analysis.result}
+                    </h5>
+                    <span class="badge bg-${isPass ? 'success' : 'warning'}">${analysis.expense_type}</span>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">${ticket.filename}</small><br>
+                    <span class="badge bg-light text-dark">
+                        ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
+                    </span>
+                </div>
             </div>
             
-            <div class="analysis-content mt-3">
-                <div style="background: white; padding: 1rem; border-radius: 8px; border-left: 4px solid var(--natixis-blue);">
+            <div class="analysis-content">
+                <div class="p-3 rounded" style="background: rgba(255,255,255,0.8); border-left: 4px solid var(--natixis-blue);">
                     ${formatAIResponse(analysis.justification)}
                 </div>
             </div>
-        </div>
-        
-        <div class="mt-2 text-end">
-            <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
-                <i class="fas fa-star me-1"></i> Rate this analysis
-            </button>
+            
+            <div class="mt-3 text-end">
+                <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
+                    <i class="fas fa-star me-1"></i> Rate Analysis
+                </button>
+            </div>
         </div>
     `;
     
@@ -1392,27 +1363,47 @@ function formatDateTime(isoString) {
 
 let selectedFiles = [];
 
-// Gestion drag & drop multiple
+// Gestion drag & drop
 function setupDragAndDrop() {
-    const uploadArea = document.getElementById('ticket-upload-area');
+    console.log('Setting up drag and drop...'); // Debug pour voir si appelé plusieurs fois
     
-    uploadArea.addEventListener('dragover', function(e) {
+    // Zone upload ticket
+    const ticketUploadArea = document.getElementById('ticket-upload-area');
+    if (!ticketUploadArea) {
+        console.log('Ticket upload area not found');
+        return;
+    }
+    
+    // Vérifier si déjà configuré pour éviter les doublons
+    if (ticketUploadArea.hasAttribute('data-drag-configured')) {
+        console.log('Drag and drop already configured');
+        return;
+    }
+    
+    ticketUploadArea.setAttribute('data-drag-configured', 'true');
+    
+    ticketUploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
         this.classList.add('drag-over');
     });
     
-    uploadArea.addEventListener('dragleave', function(e) {
+    ticketUploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
         this.classList.remove('drag-over');
     });
     
-    uploadArea.addEventListener('drop', function(e) {
+    ticketUploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
         this.classList.remove('drag-over');
         
-        const files = Array.from(e.dataTransfer.files);
-        handleMultipleTicketUpload(files);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            console.log('File dropped:', files[0].name); // Debug
+            handleTicketUpload(files[0]);
+        }
     });
+    
+    console.log('Drag and drop configured successfully');
 }
 
 function handleMultipleTicketUpload(files) {
@@ -1570,12 +1561,6 @@ function escapeHtml(s){
     });
   }
 })();
-
-
-// Initialiser au chargement
-document.addEventListener('DOMContentLoaded', function() {
-    setupDragAndDrop();
-});
 
 // ===== FONCTIONS GLOBALES POUR LES ONCLICK =====
 
