@@ -11,31 +11,29 @@
 
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary: #8b5cf6;
-            --accent: #06b6d4;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --light: #f8fafc;
-            --dark: #1e293b;
-            --border: #e2e8f0;
+            --primary: #76279b;           /* Natixis violet principal */
+            --primary-dark: #6B218D;      /* Violet foncé */
+            --secondary: #ab54d4;         /* Violet clair */
+            --accent: #51A0A2;           /* Bleu-vert accent */
+            --success: #00a651;          /* Vert Natixis */
+            --warning: #ff6600;          /* Orange Natixis */
+            --danger: #dc3545;           /* Rouge standard */
+            --light: #f2f0f0;           /* Gris très clair */
+            --dark: #1e293b;            /* Texte foncé */
+            --border: #e0e6ed;          /* Bordures */
             --glass-bg: rgba(255, 255, 255, 0.95);
             --glass-border: rgba(255, 255, 255, 0.2);
+            --natixis-gray: #f5f5f5;    /* Fond alternatif */
         }
 
         * {
             box-sizing: border-box;
         }
-
+        
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f2f0f0 0%, #e8e6e6 50%, #f8f9ff 100%);
             min-height: 100vh;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
         }
 
         /* Header fixe */
@@ -45,11 +43,32 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            background: var(--glass-bg);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
+            border-radius: 0 0 15px 15px;
+            margin: 0 20px;
+            box-shadow: 0 8px 32px rgba(118, 39, 155, 0.15);
             padding: 1rem 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(118, 39, 155, 0.2);
+            margin: 30px auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .upload-card {
+            background: linear-gradient(145deg, #ffffff, #f8f9ff);
+            border: 3px dashed var(--secondary);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .upload-card:hover {
+            background: linear-gradient(145deg, #f0f8ff, #e3f2fd);
+            border-color: var(--success);
+            box-shadow: 0 8px 25px rgba(118, 39, 155, 0.15);
         }
 
         .main-content {
@@ -76,12 +95,16 @@
             gap: 0.5rem;
         }
 
+        .status-bar {
+            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.95));
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(118, 39, 155, 0.1);
+            box-shadow: 0 2px 10px rgba(118, 39, 155, 0.05);
+        }
+
         .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
             background: var(--success);
-            animation: pulse 2s infinite;
+            box-shadow: 0 0 10px rgba(0, 166, 81, 0.5);
         }
 
         @keyframes pulse {
@@ -193,21 +216,6 @@
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
             outline: none;
-        }
-
-        .btn-analyze {
-            background: linear-gradient(135deg, var(--success), #059669);
-            color: white;
-            font-size: 1rem;
-            padding: 0.875rem 2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 1rem;
-            width: 100%;
-            transition: all 0.3s ease;
-            border: none;
         }
 
         .btn-analyze:hover:not(:disabled) {
@@ -327,16 +335,24 @@
             background: white;
             border-radius: 20px;
             padding: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 8px 32px rgba(118, 39, 155, 0.1);
             border-left: 4px solid var(--primary);
+            transition: transform 0.3s ease;
+        }
+
+        .result-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(118, 39, 155, 0.15);
         }
 
         .result-card.success {
             border-left-color: var(--success);
+            background: linear-gradient(135deg, #f0fdf4, #ffffff);
         }
 
         .result-card.warning {
             border-left-color: var(--warning);
+            background: linear-gradient(135deg, #fffbeb, #ffffff);
         }
 
         .result-card.danger {
@@ -344,18 +360,32 @@
         }
 
         /* Section chatbot - Sidebar */
+
         .chatbot-sidebar {
             background: white;
-            display: flex;
-            flex-direction: column;
-            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+            box-shadow: -8px 0 32px rgba(118, 39, 155, 0.1);
         }
 
         .chat-header {
-            background: linear-gradient(135deg, var(--secondary), var(--accent));
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 0 0 15px 15px;
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
-            padding: 1.5rem;
-            text-align: center;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.assistant {
+            background: white;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(118, 39, 155, 0.08);
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 50%;
         }
 
         .chat-container {
@@ -386,21 +416,6 @@
             }
         }
 
-        .chat-message.user {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 4px;
-        }
-
-        .chat-message.assistant {
-            background: white;
-            border: 1px solid var(--border);
-            margin-right: auto;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
         .chat-input-area {
             padding: 1rem;
             background: white;
@@ -427,19 +442,6 @@
             border-color: var(--secondary);
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
             outline: none;
-        }
-
-        .btn-send {
-            background: linear-gradient(135deg, var(--secondary), var(--accent));
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            transition: all 0.3s ease;
         }
 
         .btn-send:hover {
@@ -474,21 +476,40 @@
         }
 
         .btn-analyze {
-            background: linear-gradient(135deg, var(--success), #059669);
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            border: none;
             color: white;
+            padding: 1rem 2.5rem;
             font-size: 1.1rem;
-            padding: 1rem 2rem;
-            border-radius: 16px;
+            font-weight: 600;
+            border-radius: 50px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-top: 1.5rem;
-            width: 100%;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(118, 39, 155, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-analyze::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-analyze:hover::before {
+            left: 100%;
         }
 
         .btn-analyze:hover:not(:disabled) {
             transform: translateY(-3px);
-            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 8px 25px rgba(118, 39, 155, 0.4);
+            color: white;
         }
 
         .btn-analyze:disabled {
@@ -570,13 +591,7 @@
             .header-fixed {
                 padding: 0.75rem 1rem;
             }
-            
-            .status-bar {
-                padding: 0.5rem 1rem;
-                flex-direction: column;
-                gap: 0.5rem;
-                text-align: center;
-            }
+
             
             .upload-card {
                 padding: 2rem 1rem;
@@ -654,13 +669,34 @@
         }
 
         /* Styles pour l'aperçu de ticket */
+
         .ticket-preview-container {
-            background: linear-gradient(135deg, #f8fafc, #ffffff);
-            border: 2px solid var(--border);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, var(--natixis-gray), #ffffff);
+            border: 2px solid var(--secondary);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(118, 39, 155, 0.15);
+        }
+
+        .amount-display {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 15px;
+        }
+
+        .ticket-field {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .ticket-field:hover {
+            box-shadow: 0 4px 12px rgba(118, 39, 155, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .field-label {
+            color: var(--primary);
+            font-weight: 600;
         }
 
         .ticket-header {
@@ -675,14 +711,7 @@
             margin: 0;
         }
 
-        .amount-display {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin: 0 auto;
-            max-width: 300px;
-        }
+
 
         .amount-label {
             font-size: 0.9rem;
@@ -696,22 +725,7 @@
             font-family: 'Inter', sans-serif;
         }
 
-        .ticket-field {
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            height: 100%;
-        }
 
-        .field-label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
 
         .field-value {
             font-size: 1rem;
@@ -740,7 +754,7 @@
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-primary px-3 py-2">{{ user.full_name }}</span>
+                <span class="badge px-3 py-2" style="background: var(--secondary); color: white;">{{ user.full_name }}</span>
                 {% if user.role == 'admin' %}
                 <button class="btn btn-outline-primary btn-sm btn-modern" onclick="showAdminPanel()">
                     <i class="fas fa-cogs me-1"></i> Admin
