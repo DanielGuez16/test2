@@ -489,6 +489,10 @@ async def analyze_ticket(
         }
         
         chatbot_session["analysis_history"].append(analysis_record)
+        try:
+            save_analysis_to_sharepoint(analysis_record)
+        except Exception as e:
+            logger.warning(f"Erreur sauvegarde analyse SharePoint: {e}")
         
         return response_data
         
@@ -811,6 +815,51 @@ def preprocess_image_for_ocr(image):
     except Exception as e:
         logger.warning(f"Erreur preprocessing: {e}")
         return image
+    
+def save_analysis_to_sharepoint(analysis_record: dict):
+    """Sauvegarde l'analyse dans SharePoint pour persistance"""
+    try:
+        from user_management import get_sharepoint_client
+        import pandas as pd
+        
+        client = get_sharepoint_client()
+        analysis_path = "Chatbot/logs/analysis_history.xlsx"
+        
+        # Aplatir les données pour Excel
+        flat_record = {
+            "timestamp": analysis_record["timestamp"],
+            "user": analysis_record["user"],
+            "ticket_filename": analysis_record["ticket_filename"],
+            "question": analysis_record["question"],
+            "result": analysis_record["analysis_result"]["result"],
+            "expense_type": analysis_record["analysis_result"]["expense_type"],
+            "amount": analysis_record["ticket_info"].get("amount"),
+            "currency": analysis_record["ticket_info"].get("currency"),
+            "vendor": analysis_record["ticket_info"].get("vendor"),
+            "confidence": analysis_record["ticket_info"].get("confidence")
+        }
+        
+        # Lire existant ou créer nouveau
+        try:
+            binary_content = client.read_binary_file(analysis_path)
+            existing_data = client.read_excel_file_as_dict(binary_content)
+            df = pd.DataFrame(existing_data)
+        except:
+            df = pd.DataFrame()
+        
+        # Ajouter nouvelle ligne
+        new_df = pd.DataFrame([flat_record])
+        df = pd.concat([df, new_df], ignore_index=True)
+        
+        # Limiter à 1000 analyses
+        if len(df) > 1000:
+            df = df.tail(1000)
+            
+        # Sauvegarder
+        client.save_dataframe_in_sharepoint(df, analysis_path, False)
+        
+    except Exception as e:
+        logger.error(f"Erreur sauvegarde analyse SharePoint: {e}")
     
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
     """Extrait SEULEMENT le texte brut du ticket - AUCUNE analyse"""

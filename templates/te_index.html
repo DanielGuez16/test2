@@ -1941,21 +1941,224 @@
             }
         }
 
-        // Fonctions admin (stubs - à implémenter selon les fonctions existantes)
         async function loadFullHistory() {
-            // Implementation from original code
+            const historyDiv = document.getElementById('full-history');
+            if (!historyDiv) return;
+            
+            try {
+                const response = await fetch('/api/analysis-history');
+                const result = await response.json();
+                
+                if (result.success && result.history.length > 0) {
+                    historyDiv.innerHTML = result.history.map(item => `
+                        <div class="history-item border-bottom py-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-file me-2"></i>${item.ticket_filename}
+                                    </h6>
+                                    <p class="mb-1 text-muted">${item.question || 'No specific question'}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>${item.user} • 
+                                        <i class="fas fa-clock me-1"></i>${formatDateTime(item.timestamp)}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-${item.analysis_result.result === 'PASS' ? 'success' : 'warning'} mb-2">
+                                        ${item.analysis_result.result}
+                                    </span>
+                                    <br>
+                                    <small class="text-muted">
+                                        ${item.ticket_info.amount ? `${item.ticket_info.amount} ${item.ticket_info.currency || ''}` : 'N/A'}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    historyDiv.innerHTML = `
+                        <div class="text-center text-muted p-4">
+                            <i class="fas fa-inbox fa-2x mb-3"></i>
+                            <p>No analysis history found</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error loading history:', error);
+                historyDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error loading history
+                    </div>
+                `;
+            }
         }
 
         async function loadAdminLogs() {
-            // Implementation from original code  
+            const logsDiv = document.getElementById('admin-logs');
+            if (!logsDiv) return;
+            
+            try {
+                const response = await fetch('/api/logs');
+                const result = await response.json();
+                
+                if (result.success) {
+                    logsDiv.innerHTML = `
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card bg-primary text-white">
+                                        <div class="card-body text-center">
+                                            <h4>${result.logs.length}</h4>
+                                            <p class="mb-0">Total Logs</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card bg-info text-white">
+                                        <div class="card-body text-center">
+                                            <h4>${new Set(result.logs.map(l => l.username)).size}</h4>
+                                            <p class="mb-0">Active Users</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${result.logs.slice(-50).reverse().map(log => `
+                                        <tr>
+                                            <td><small>${formatDateTime(log.timestamp)}</small></td>
+                                            <td><small>${log.username}</small></td>
+                                            <td><span class="badge bg-secondary">${log.action}</span></td>
+                                            <td><small>${log.details}</small></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error loading admin logs:', error);
+                logsDiv.innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
+            }
         }
 
         async function loadAdminUsers() {
-            // Implementation from original code
+            const usersDiv = document.getElementById('admin-users');
+            if (!usersDiv) return;
+            
+            try {
+                const response = await fetch('/api/users');
+                const result = await response.json();
+                
+                if (result.success) {
+                    usersDiv.innerHTML = `
+                        <div class="row">
+                            ${result.users.map(user => `
+                                <div class="col-md-6 mb-3">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="card-title">${user.full_name}</h6>
+                                            <p class="card-text">
+                                                <small class="text-muted">${user.username}</small><br>
+                                                <span class="badge bg-${user.role === 'admin' ? 'danger' : 'primary'}">${user.role}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error loading admin users:', error);
+                usersDiv.innerHTML = '<div class="alert alert-danger">Error loading users</div>';
+            }
         }
 
         async function loadAdminFeedback() {
-            // Implementation from original code
+            const feedbackDiv = document.getElementById('admin-feedback');
+            if (!feedbackDiv) return;
+            
+            try {
+                const response = await fetch('/api/feedback-stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.stats;
+                    feedbackDiv.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4>${stats.total_feedback}</h4>
+                                        <p class="mb-0">Total Feedback</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4>${stats.average_rating}/5</h4>
+                                        <p class="mb-0">Average Rating</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6>Rating Distribution:</h6>
+                                        ${Object.entries(stats.rating_distribution).map(([rating, count]) => 
+                                            `<div>⭐${rating}: ${count}</div>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    feedbackDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No feedback data available yet
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error loading admin feedback:', error);
+                feedbackDiv.innerHTML = '<div class="alert alert-danger">Error loading feedback</div>';
+            }
+        }
+
+        // Et ajoutez formatDateTime si elle n'existe pas :
+        function formatDateTime(isoString) {
+            try {
+                const date = new Date(isoString);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (error) {
+                return isoString ? isoString.substring(0, 16) : '';
+            }
         }
     </script>
 </body>

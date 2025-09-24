@@ -1068,6 +1068,8 @@ function showHistory() {
     }
 }
 
+
+// Ce qui devrait être implémenté
 async function loadFullHistory() {
     const historyDiv = document.getElementById('full-history');
     if (!historyDiv) return;
@@ -1078,20 +1080,26 @@ async function loadFullHistory() {
         
         if (result.success && result.history.length > 0) {
             historyDiv.innerHTML = result.history.map(item => `
-                <div class="history-item">
+                <div class="history-item border-bottom py-3">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="mb-1">${item.ticket_filename}</h6>
-                            <p class="mb-1">${item.question}</p>
+                            <h6 class="mb-1">
+                                <i class="fas fa-file me-2"></i>${item.ticket_filename}
+                            </h6>
+                            <p class="mb-1 text-muted">${item.question || 'No specific question'}</p>
                             <small class="text-muted">
-                                <i class="fas fa-user me-1"></i>${item.user} •
+                                <i class="fas fa-user me-1"></i>${item.user} • 
                                 <i class="fas fa-clock me-1"></i>${formatDateTime(item.timestamp)}
                             </small>
                         </div>
                         <div class="text-end">
-                            <span class="status-indicator status-${item.analysis_result.is_valid ? 'approved' : 'pending'}">
-                                ${item.analysis_result.status}
+                            <span class="badge bg-${item.analysis_result.result === 'PASS' ? 'success' : 'warning'} mb-2">
+                                ${item.analysis_result.result}
                             </span>
+                            <br>
+                            <small class="text-muted">
+                                ${item.ticket_info.amount ? `${item.ticket_info.amount} ${item.ticket_info.currency || ''}` : 'N/A'}
+                            </small>
                         </div>
                     </div>
                 </div>
