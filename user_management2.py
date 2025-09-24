@@ -128,7 +128,6 @@ def _log_activity_fallback(username: str, action: str, details: str = ""):
     except Exception as e:
         print(f"ERREUR sauvegarde fallback: {e}")
 
-
 def save_analysis_to_sharepoint(analysis_record: dict):
     """Sauvegarde l'analyse dans SharePoint - ANALYSES SEULEMENT"""
     try:
@@ -220,36 +219,42 @@ def save_feedback_to_sharepoint(feedback_record: dict):
         print(f"ERREUR sauvegarde feedback SharePoint: {e}")
         _save_to_local_file(feedback_record, FEEDBACK_FILE)
 
-def get_logs(limit: int = 100) -> List[Dict]:
-    """Récupère les logs d'activité depuis SharePoint"""
+def get_logs(limit: int = 500) -> List[Dict]:
+    """Récupère les logs depuis SharePoint"""
     try:
         client = get_sharepoint_client()
         binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
         logs_data = client.read_excel_file_as_dict(binary_content)
         
-        if not logs_data:
-            return []
-        
-        # Convertir en DataFrame
+        # Convertir en DataFrame pour manipulation
         logs_df = pd.DataFrame(logs_data)
         
-        # S'assurer que les colonnes requises existent
-        required_columns = ["timestamp", "username", "action", "details"]
-        for col in required_columns:
-            if col not in logs_df.columns:
-                logs_df[col] = ""
+        # Trier par timestamp et limiter
+        if not logs_df.empty and 'timestamp' in logs_df.columns:
+            logs_df = logs_df.sort_values('timestamp', ascending=False)
+            limited_logs = logs_df.head(limit)
+            return limited_logs.to_dict('records')
         
-        # Filtrer et trier
-        logs_df = logs_df[required_columns]
-        logs_df = logs_df.sort_values('timestamp', ascending=False)
-        
-        # Limiter et retourner
-        limited_logs = logs_df.head(limit)
-        return limited_logs.to_dict('records')
+        return []
         
     except Exception as e:
         print(f"ERREUR lecture logs SharePoint: {e}")
-        return _get_from_local_file(LOGS_FILE, limit)
+        # Fallback vers fichier local
+        return _get_logs_fallback(limit)
+
+def _get_logs_fallback(limit: int = 100) -> List[Dict]:
+    """Lecture locale de secours"""
+    if not os.path.exists(LOGS_FILE):
+        return []
+    
+    try:
+        with open(LOGS_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        return logs[-limit:] if logs else []
+    except Exception as e:
+        print(f"ERREUR lecture logs fallback: {e}")
+        return []
+
 
 def get_analysis_history(limit: int = 100) -> List[Dict]:
     """Récupère l'historique des analyses depuis SharePoint"""
