@@ -79,7 +79,8 @@ def log_activity(username: str, action: str, details: str = ""):
         try:
             binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
             existing_data = client.read_excel_file_as_dict(binary_content)
-            logs_df = pd.DataFrame(existing_data)
+            # CORRECTION: Spécifier les colonnes explicitement
+            logs_df = pd.DataFrame(existing_data, columns=["timestamp", "username", "action", "details"])
         except:
             # Si le fichier n'existe pas, créer un DataFrame vide
             logs_df = pd.DataFrame(columns=["timestamp", "username", "action", "details"])
@@ -88,19 +89,23 @@ def log_activity(username: str, action: str, details: str = ""):
         new_log_df = pd.DataFrame([log_entry])
         logs_df = pd.concat([logs_df, new_log_df], ignore_index=True)
         
+        # CORRECTION: Ne garder que les colonnes nécessaires
+        logs_df = logs_df[["timestamp", "username", "action", "details"]]
+        
         # Limiter à 1000 logs maximum
         if len(logs_df) > 1000:
             logs_df = logs_df.tail(1000)
         
         # Sauvegarder dans SharePoint
-        client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH)
-        
+        client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH, False)
+
         print(f"LOG: {username} - {action} - {details}")
         
     except Exception as e:
         print(f"ERREUR sauvegarde log SharePoint: {e}")
         # Fallback vers le fichier local en cas d'erreur SharePoint
         _log_activity_fallback(username, action, details)
+
 
 def _log_activity_fallback(username: str, action: str, details: str = ""):
     """Sauvegarde locale de secours en cas d'erreur SharePoint"""
