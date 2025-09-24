@@ -84,8 +84,10 @@ def log_activity(username: str, action: str, details: str = ""):
             logs_df = pd.DataFrame(columns=["timestamp", "username", "action", "details"])
         
         # Ajouter le nouveau log
-        new_log_df = pd.DataFrame([log_entry])
-        logs_df = pd.concat([logs_df, new_log_df], ignore_index=True)
+        if logs_df.empty:
+            logs_df = pd.DataFrame([log_entry])
+        else:
+            logs_df.loc[len(logs_df)] = log_entry
         
         # Limiter à 1000 logs maximum
         if len(logs_df) > 1000:
@@ -161,9 +163,12 @@ def save_analysis_to_sharepoint(analysis_record: dict):
             ])
         
         # Ajouter nouvelle ligne
-        new_df = pd.DataFrame([{k: v for k, v in flat_record.items() if k != "type"}])
-        df = pd.concat([df, new_df], ignore_index=True)
-        
+        clean_record = {k: v for k, v in flat_record.items() if k != "type"}
+        if df.empty:
+            df = pd.DataFrame([clean_record])
+        else:
+            df.loc[len(df)] = clean_record
+
         # Limiter à 1000 analyses
         if len(df) > 1000:
             df = df.tail(1000)
@@ -204,8 +209,11 @@ def save_feedback_to_sharepoint(feedback_record: dict):
             ])
         
         # Ajouter nouveau feedback
-        new_df = pd.DataFrame([{k: v for k, v in feedback_data.items() if k != "type"}])
-        df = pd.concat([df, new_df], ignore_index=True)
+        clean_feedback = {k: v for k, v in feedback_data.items() if k != "type"}
+        if df.empty:
+            df = pd.DataFrame([clean_feedback])
+        else:
+            df.loc[len(df)] = clean_feedback
         
         # Limiter à 500 feedbacks
         if len(df) > 500:
