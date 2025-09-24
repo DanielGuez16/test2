@@ -960,6 +960,7 @@
         let currentTicketFile = null;
         let selectedRating = 0;
         let isAnalyzing = false;
+        let extractedTicketInfo = null;
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', function() {
@@ -1220,6 +1221,135 @@
             }
         }
 
+        function displayTicketPreview(data) {
+            const ticket = data.ticket_info;
+            
+            // Créer ou trouver la zone d'aperçu
+            let previewSection = document.getElementById('ticket-preview-section');
+            if (!previewSection) {
+                previewSection = document.createElement('div');
+                previewSection.id = 'ticket-preview-section';
+                previewSection.className = 'results-section';
+                
+                const analysisArea = document.querySelector('.analysis-content-area');
+                analysisArea.appendChild(previewSection);
+            }
+            
+            // Déterminer la couleur de confiance
+            const confidence = ticket.confidence || 0.5;
+            let confidenceClass = 'low';
+            let confidenceText = 'Low Confidence';
+            
+            if (confidence > 0.8) {
+                confidenceClass = 'high';
+                confidenceText = 'High Confidence';
+            } else if (confidence > 0.6) {
+                confidenceClass = 'medium';
+                confidenceText = 'Medium Confidence';
+            }
+            
+            previewSection.innerHTML = `
+                <div style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); border: 1px solid var(--border); margin-top: 2rem; position: relative; overflow: hidden;">
+                    <!-- Barre de couleur en haut -->
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--secondary));"></div>
+                    
+                    <!-- Badge de confiance -->
+                    <div style="position: absolute; top: 1rem; right: 1rem; background: ${confidence > 0.8 ? 'var(--success)' : confidence > 0.6 ? 'var(--warning)' : 'var(--danger)'}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                        ${Math.round(confidence * 100)}% ${confidenceText}
+                    </div>
+                    
+                    <!-- Header du ticket -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px dashed var(--border);">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="font-size: 2rem; color: var(--accent);">
+                                <i class="fas fa-receipt"></i>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom: 0.5rem;">Extracted Ticket Information</h4>
+                                <p style="color: #6b7280; margin: 0;">${ticket.filename || 'Unknown file'}</p>
+                            </div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, var(--accent), var(--secondary)); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600; text-transform: uppercase;">
+                            ${ticket.category || 'Unknown'}
+                        </div>
+                    </div>
+                    
+                    <!-- Corps du ticket -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <div>
+                            <!-- Montant -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Amount</div>
+                                <div style="font-size: ${ticket.amount ? '1.5rem' : '1.1rem'}; font-weight: ${ticket.amount ? '700' : '500'}; color: ${ticket.amount ? 'var(--success)' : '#9ca3af'}; padding: 0.75rem; background: ${ticket.amount ? 'linear-gradient(135deg, #f0fdf4, #dcfce7)' : '#f8fafc'}; border-radius: 8px; border-left: 3px solid ${ticket.amount ? 'var(--success)' : 'var(--accent)'}; text-align: ${ticket.amount ? 'center' : 'left'};">
+                                    ${ticket.amount ? 
+                                        `${ticket.amount} ${ticket.currency || ''}` : 
+                                        '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'
+                                    }
+                                </div>
+                            </div>
+                            
+                            <!-- Date -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Date</div>
+                                <div style="font-size: 1.1rem; font-weight: 500; color: ${ticket.date ? 'var(--dark)' : '#9ca3af'}; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid var(--accent);">
+                                    ${ticket.date || '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'}
+                                </div>
+                            </div>
+                            
+                            <!-- Vendor -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Vendor</div>
+                                <div style="font-size: 1.1rem; font-weight: 500; color: ${ticket.vendor ? 'var(--dark)' : '#9ca3af'}; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid var(--accent);">
+                                    ${ticket.vendor || '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <!-- Catégorie -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Category</div>
+                                <div style="font-size: 1.1rem; font-weight: 500; color: ${ticket.category && ticket.category !== 'unknown' ? 'var(--dark)' : '#9ca3af'}; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid var(--accent);">
+                                    ${ticket.category && ticket.category !== 'unknown' ? 
+                                        ticket.category.charAt(0).toUpperCase() + ticket.category.slice(1) : 
+                                        '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'
+                                    }
+                                </div>
+                            </div>
+                            
+                            <!-- Location -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Location</div>
+                                <div style="font-size: 1.1rem; font-weight: 500; color: ${ticket.location ? 'var(--dark)' : '#9ca3af'}; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid var(--accent);">
+                                    ${ticket.location || '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'}
+                                </div>
+                            </div>
+                            
+                            <!-- Currency -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Currency</div>
+                                <div style="font-size: 1.1rem; font-weight: 500; color: ${ticket.currency ? 'var(--dark)' : '#9ca3af'}; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border-left: 3px solid var(--accent);">
+                                    ${ticket.currency || '<span style="color: #9ca3af; font-style: italic;">Not detected</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div style="text-align: center; padding-top: 1rem; border-top: 1px solid var(--border); color: #6b7280; font-size: 0.9rem;">
+                        <p style="margin: 0;">
+                            <i class="fas fa-robot" style="margin-right: 0.5rem;"></i>
+                            Extracted using AI • ${new Date().toLocaleTimeString()}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            // Scroll vers l'aperçu
+            previewSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+
         function updateUploadUI(file) {
             const uploadCard = document.getElementById('ticket-upload-area');
             const statusDiv = document.getElementById('ticket-status');
@@ -1446,6 +1576,7 @@
 
         function resetAnalysis() {
             currentTicketFile = null;
+            extractedTicketInfo = null;
             isAnalyzing = false;
             
             // Reset UI
@@ -1453,12 +1584,30 @@
             
             // Cacher les résultats
             const resultsSection = document.getElementById('analysis-results');
-            resultsSection.style.display = 'none';
+            if (resultsSection) {
+                resultsSection.style.display = 'none';
+            }
             
-            // Reset bouton
+            // Cacher l'aperçu - AJOUTER CES LIGNES
+            const previewSection = document.getElementById('ticket-preview-section');
+            if (previewSection) {
+                previewSection.remove();
+            }
+            
+            // Reset boutons
             const analyzeBtn = document.getElementById('analyze-btn');
-            analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
-            analyzeBtn.disabled = true;
+            const extractBtn = document.getElementById('extract-btn'); 
+            
+            if (analyzeBtn) {
+                analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+                analyzeBtn.disabled = true;
+            }
+            
+            // AJOUTER CE BLOC
+            if (extractBtn) {
+                extractBtn.innerHTML = '<i class="fas fa-eye me-2"></i>Preview Extraction';
+                extractBtn.disabled = true;
+            }
             
             // Reset question
             document.getElementById('question-input').value = '';
