@@ -26,15 +26,13 @@ class TicketAnalyzer:
         self.llm_connector = llm_connector
         self.context_builder = TEContextBuilder()
     
-    def analyze_ticket(self, ticket_info: dict, user_question: str = "") -> dict:
+    def analyze_ticket(self, ticket_info: dict, te_documents: dict, user_question: str = "") -> dict:
         """Analyse complète d'un ticket T&E avec IA directe (sans RAG)"""
         logger.info(f"Début analyse ticket: {ticket_info.get('filename', 'N/A')}")
         
         try:
-            from run import te_documents
-            
             # Construire le contexte complet avec TOUTES les données
-            full_context = self._build_complete_context()
+            full_context = self._build_complete_context(te_documents)
             
             # Construire le prompt d'analyse
             prompt = f"""
@@ -46,18 +44,34 @@ class TicketAnalyzer:
             - Date: {ticket_info.get('date', 'Not detected')}
             - Vendor: {ticket_info.get('vendor', 'Not detected')}
             - Location: {ticket_info.get('location', 'Not detected')}
+
+            ANALYSIS REQUIREMENTS:
+            1. Search the CONSOLIDATED LIMITS above for exact matching rules (country(continent/region)/currency/type)
+            2. Compare the ticket amount against the CONSOLIDATED LIMITS
+            3. Extract relevant policy content from the TRAVEL & ENTERTAINMENT PROCEDURES if applicable
+            4. Provide PASS or FAIL decision with specific reasoning. There must always be a part of the answer that explains why it is PASS or FAIL this way : Result: PASS or Result: FAIL
+            5. Quote the exact rule or policy section that applies
+            6. Extract and explain the actual content from relevant sections to justify the answers
+            7. NEVER say 'refer to section X' without explaining what that section contains
+            8. Give precise answers with specific numbers, currencies, and details
+            9. Give specific recommendations if non-compliant
+
             
-            Please provide:
-            1. PASS or FAIL decision
-            2. Expense type (Hotel/Meal/Breakfast/Transport etc.)
-            3. Justification based on the T&E rules
-            4. Professional comment with recommendations
-            
-            Answer in English since the policies are in English.
+            FORMAT YOUR RESPONSE:
+            - Result: PASS or FAIL
+            - Expense Type: [Hotel/Meal/Breakfast/Transport/etc.]
+            - Applied Rules: [Exact rule from CONSOLIDATED LIMITS : Country, Currency, Type, Limit]
+            - Policy Extract: [Relevant content from TRAVEL & ENTERTAINMENT PROCEDURES if applicable]
+            - Justification: [Specific reasoning with numbers]
+            - Recommendation: [Action needed if any]
+
+            Be brief, precise, factual, and cite exact data from the knowledge base above.
+
             """
             
             # Appel direct à l'IA avec contexte complet
             ai_response = self.llm_connector.get_llm_response(prompt, full_context)
+            print(ai_response)
             
             # Parser la réponse pour extraire les éléments
             result_info = self._parse_ai_analysis_response(ai_response, ticket_info)
@@ -83,22 +97,22 @@ class TicketAnalyzer:
                 'timestamp': datetime.now().isoformat()
             }
 
-    def answer_general_question(self, user_question: str, te_rules_summary: dict) -> dict:
+    def answer_general_question(self, user_question: str, te_documents: dict) -> dict:
         """Répond à une question générale avec contexte complet"""
         try:
-            from run import te_documents
-            
             # Contexte complet pour question générale
-            full_context = self._build_complete_context()
+            full_context = self._build_complete_context(te_documents)
             
             prompt = f"""
             QUESTION: {user_question}
-            
-            Please answer based on the complete T&E policies and rules provided.
-            Be specific and cite the relevant rules or policies.
-            Answer in English.
+            === MANDATORY INSTRUCTIONS ===
+            1. ALWAYS extract and quote exact content from COMPLETE T&E RULES AND POLICIES - never just reference sections
+            2. For amount/price/expense queries: identify exact country(or continent or region)/currency/type and provide the specific limit amount
+            3. For policy questions: extract and explain the actual content from relevant sections
+            4. NEVER say 'refer to section X' without explaining what that section contains
+            5. Give precise answers with specific numbers, currencies, and details
+            6. Search through ALL data in the context to find relevant information
             """
-            
             ai_response = self.llm_connector.get_llm_response(prompt, full_context)
             
             return {
@@ -114,7 +128,6 @@ class TicketAnalyzer:
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
-
 
     def _extract_analysis_criteria(self, ticket_info: dict) -> dict:
         """Extrait les critères d'analyse du ticket"""
@@ -147,35 +160,31 @@ class TicketAnalyzer:
         
         return mapping.get(category_lower, 'Meal1')
 
-
     def _ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
         """Extrait TOUTES les informations du ticket via IA + RAG"""
         try:
             # Construire le prompt d'extraction
             extraction_prompt = f"""
-            Analyse ce ticket et extrait les informations suivantes au format JSON :
+            Parse this ticket and extract/deduct the following information in JSON format :
             {{
-                "amount": float ou null,
-                "currency": "EUR/USD/etc" ou null,
-                "category": "hotel/meal/transport/flight" ou "unknown",
-                "subcategory": "breakfast/lunch/dinner/accommodation" ou null,
-                "date": "YYYY-MM-DD" ou null,
-                "vendor": "nom établissement" ou null,
-                "location": "ville/pays" ou null,
-                "country_code": "FR/US/etc" ou null,
-                "confidence": float entre 0 et 1
+                "amount": float or null,
+                "currency": "EUR/USD/etc" or null,
+                "category": "hotel/meal/transport/flight" or "unknown",
+                "subcategory": "breakfast/lunch/dinner/accommodation" or null,
+                "date": "YYYY-MM-DD" or null,
+                "vendor": "name of vendor/trader/shop" or null,
+                "location": "country/city" or null,
+                "country_code": "FR/US/etc" or null,
+                "confidence": float between 0 and 1
             }}
             
-            Ticket à analyser:
+            Ticket to analyze :
             {raw_text[:2000]}
             """
             
             # Obtenir le contexte des règles T&E
-            context = self.context_builder.build_context(
-                'ticket_extraction',
-                te_rules_summary=self._get_rules_summary()
-            )
-            
+            context = "You are an expert in T&E analysis. You are given a ticket/raw text and your task is to extract precise information from it. You must return the extracted information in JSON format. You must return the JSON only, no context or additional text and information."
+
             # Appel IA
             ai_response = self.llm_connector.get_llm_response(extraction_prompt, context)
             
@@ -199,6 +208,10 @@ class TicketAnalyzer:
             logger.error(f"Erreur extraction IA: {e}")
             # Fallback vers méthode basique
             return self._fallback_extraction(raw_text, filename)
+
+    def ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
+        """Méthode publique pour extraction IA"""
+        return self._ai_extract_ticket_info(raw_text, filename)
 
     def _get_rules_summary(self) -> dict:
         """Résumé des règles pour le contexte IA"""
@@ -257,11 +270,6 @@ class TicketAnalyzer:
             "extraction_method": "fallback",
             "error": "AI extraction failed"
         }
-
-    def ai_extract_ticket_info(self, raw_text: str, filename: str) -> dict:
-        """Méthode publique pour extraction IA"""
-        return self._ai_extract_ticket_info(raw_text, filename)
-
 
     def _determine_expense_type(self, ticket_info: dict, rules: List[Dict]) -> str:
         """Détermine le type de dépense en français business"""
@@ -329,33 +337,42 @@ class TicketAnalyzer:
         
         return min(confidence, 1.0)
 
-    def _build_complete_context(self) -> str:
-        """Construit un contexte complet avec TOUTES les données T&E"""
-        from run import te_documents
-        
+    def _build_complete_context(self, te_documents: dict) -> str:
+        """Construit un contexte complet avec TOUTES les données T&E"""        
         context_parts = []
         
         context_parts.append("=== COMPLETE T&E RULES AND POLICIES ===")
-        context_parts.append("You are a T&E expense analysis expert for APAC region.")
+        context_parts.append("You are a T&E expense analysis expert. You have to access to complete TRAVEL & ENTERTAINMENT PROCEDURES and CONSOLIDATED LIMITS below.")
         context_parts.append("")
+
         
         # TOUTES les règles Excel - 3 sheets complètes
         if te_documents.get("excel_rules"):
-            context_parts.append("COMPLETE EXCEL RULES:")
+            context_parts.append("CONSOLIDATED LIMITS:")
+
+            # Define a mapping for the rule types
+            type_mapping = {
+                "Hotel1": "Hotel",
+                "Breakfast1": "Breakfast",
+                "Meal1": "Meal"
+            }
             
             for sheet_name, rules in te_documents["excel_rules"].items():
+                if sheet_name == "Breakfast & Lunch & Dinner":
+                    sheet_name = "Internal Staff Meal"
                 context_parts.append(f"\n{sheet_name} Sheet:")
                 context_parts.append(f"Total rules: {len(rules)}")
                 
                 for rule in rules:
-                    rule_line = f"- Currency: {rule.get('currency', 'N/A')}, Country: {rule.get('country', 'N/A')}, Type: {rule.get('type', 'N/A')}, Limit: {rule.get('amount_limit', 0)}"
+                    rule_type = type_mapping.get(rule.get('type', 'N/A'), rule.get('type', 'N/A'))
+                    rule_line = f"- For a travel in {rule.get('country', 'N/A')} with a expense for {rule_type}, the limit is {rule.get('amount_limit', 0)} {rule.get('currency', 'N/A')}\n"
                     context_parts.append(rule_line)
             
             context_parts.append("")
         
         # TOUT le document Word - 16 pages complètes
         if te_documents.get("word_policies"):
-            context_parts.append("COMPLETE WORD POLICIES (16 pages):")
+            context_parts.append("TRAVEL & ENTERTAINMENT PROCEDURES:")
             context_parts.append(te_documents["word_policies"])
             context_parts.append("")
         
@@ -368,7 +385,7 @@ class TicketAnalyzer:
         
         # Détection simple basée sur mots-clés
         result = "FAIL"
-        if any(word in ai_response.upper() for word in ["PASS", "APPROVED", "COMPLIANT", "VALID"]):
+        if any(word in ai_response.upper() for word in ["PASS"]):
             result = "PASS"
         
         expense_type = "Unknown"
@@ -392,46 +409,3 @@ class TicketAnalyzer:
             'expense_type': expense_type,
             'justification': justification
         }
-
-def test_ticket_analyzer():
-    """Teste l'analyseur de tickets"""
-    from llm_connector import LLMConnector
-    
-    # Mock RAG system pour les tests
-    class MockRAGSystem:
-        def search_relevant_rules(self, query, filters=None):
-            return [{
-                'type': 'Hotel1',
-                'country': 'FR',
-                'currency': 'EUR',
-                'amount_limit': 200,
-                'sheet_name': 'Hotel'
-            }]
-    
-    # Initialiser
-    rag_system = MockRAGSystem()
-    llm_connector = LLMConnector()
-    analyzer = TicketAnalyzer(rag_system, llm_connector)
-    
-    # Ticket de test
-    ticket_info = {
-        'filename': 'hotel_paris.pdf',
-        'amount': 150,
-        'currency': 'EUR',
-        'category': 'hotel',
-        'location': 'Paris',
-        'vendor': 'Hotel Marais'
-    }
-    
-    # Analyser
-    result = analyzer.analyze_ticket(ticket_info, "Ce montant est-il acceptable?")
-    
-    print("=== TEST TICKET ANALYZER ===")
-    print(f"Result: {result['result']}")
-    print(f"Expense Type: {result['expense_type']}")
-    print(f"Justification: {result['justification']}")
-    print(f"Confidence: {result['confidence_score']}")
-
-
-if __name__ == "__main__":
-    test_ticket_analyzer()
