@@ -239,6 +239,67 @@ async function previewTicket() {
     }
 }
 
+// COPIE EXACTE de main2.js
+async function loadLogsStats() {
+    try {
+        const response = await fetch('/api/logs-stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            const stats = result.stats;
+            const statsHtml = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">${stats.total}</h5>
+                                <p class="card-text">Total Logs</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">${stats.users}</h5>
+                                <p class="card-text">Active Users</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-info">${stats.actions}</h5>
+                                <p class="card-text">Action Types</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">Online</h5>
+                                <p class="card-text">System Status</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+            `;
+            
+            document.getElementById('admin-logs').innerHTML = statsHtml;
+            // Charger les logs après les statistiques
+            loadActivityLogs();
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        document.getElementById('admin-logs').innerHTML = '<div class="alert alert-danger">Error loading statistics</div>';
+    }
+}
+
+// Modifier loadAdminLogs pour utiliser la nouvelle fonction
+async function loadAdminLogs() {
+    loadLogsStats(); // Utilise la fonction qui charge stats + logs
+}
+
 // Afficher l'aperçu stylisé du ticket
 function displayTicketPreview(ticketInfo, confidence) {
     const content = document.getElementById('ticket-preview-content');

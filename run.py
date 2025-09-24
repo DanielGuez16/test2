@@ -47,7 +47,7 @@ rag_system = TERAGSystem()
 # Imports internes
 from llm_connector import LLMConnector
 from te_document_processor import TEDocumentProcessor
-from user_management import authenticate_user, log_activity, get_logs, USERS_DB, authenticate_user, get_analysis_history, get_feedback_stats, save_analysis_to_sharepoint, save_feedback_to_sharepoint
+from user_management import authenticate_user, log_activity, get_logs, USERS_DB, authenticate_user, get_analysis_history, get_feedback_stats, save_feedback_to_sharepoint
 
 from sharepoint_connector import SharePointClient
 from embedding_connector import EMBEDDINGConnector
@@ -491,9 +491,16 @@ async def analyze_ticket(
         
         # Sauvegarder dans SharePoint (nouvelle fonction séparée)
         try:
-            save_analysis_to_sharepoint(analysis_record)
+            from user_management import save_analysis_history
+            save_analysis_history(
+                current_user["username"],
+                ticket_file.filename,
+                question,
+                analysis_result,
+                ticket_info
+            )
         except Exception as e:
-            logger.warning(f"Erreur sauvegarde analyse SharePoint: {e}")
+            logger.warning(f"Erreur sauvegarde analyse: {e}")
         
         return response_data
         
@@ -544,56 +551,16 @@ async def chat_with_ai(request: Request, session_token: Optional[str] = Cookie(N
         logger.error(f"Erreur chatbot: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur chatbot: {str(e)}")
 
-@app.post("/api/feedback")
-async def submit_feedback(
-    request: Request,
-    session_token: Optional[str] = Cookie(None)
-):
-    """Soumet un feedback sur une réponse du chatbot"""
-    current_user = get_current_user_from_session(session_token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        data = await request.json()
-        
-        feedback_record = {
-            "timestamp": datetime.now().isoformat(),
-            "user": current_user["username"],
-            "analysis_id": data.get("analysis_id", ""),
-            "rating": int(data.get("rating", 0)),
-            "comment": data.get("comment", ""),
-            "issue_type": data.get("issue_type", "")
-        }
-        
-        # CORRECTION: Sauvegarder dans SharePoint (plus en local CSV)
-        try:
-            save_feedback_to_sharepoint(feedback_record)
-        except Exception as e:
-            logger.warning(f"Erreur sauvegarde feedback SharePoint: {e}")
-        
-        log_activity(current_user["username"], "FEEDBACK", 
-                    f"Rating: {feedback_record['rating']}, Issue: {feedback_record['issue_type']}")
-        
-        return {
-            "success": True,
-            "message": "Feedback submitted successfully"
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur feedback: {e}")
-        raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
-
 
 @app.get("/api/analysis-history")
 async def get_analysis_history_api(session_token: Optional[str] = Cookie(None)):
-    """Récupère l'historique des analyses"""
+    """Récupère l'historique des analyses - Version simplifiée"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        # Récupérer depuis SharePoint via la nouvelle fonction
+        from user_management import get_analysis_history
         history = get_analysis_history(limit=50)
         
         # Filtrer par utilisateur si non admin
@@ -612,7 +579,6 @@ async def get_analysis_history_api(session_token: Optional[str] = Cookie(None)):
     except Exception as e:
         logger.error(f"Erreur récupération historique: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading history: {str(e)}")
-
 
 @app.get("/api/te-status")
 async def get_te_status():
@@ -674,6 +640,24 @@ async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: 
         "total": len(logs)
     }
 
+@app.get("/api/logs-stats")
+async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
+    """COPIE EXACTE de run2.py"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from user_management import get_logs_stats
+    stats = get_logs_stats()
+    
+    return {
+        "success": True,
+        "stats": stats
+    }
+
 @app.get("/api/users")
 async def get_users_list(session_token: Optional[str] = Cookie(None)):
     current_user = get_current_user_from_session(session_token)
@@ -698,6 +682,41 @@ async def get_users_list(session_token: Optional[str] = Cookie(None)):
         "users": users
     }
 
+@app.post("/api/feedback")
+async def submit_feedback(
+    request: Request,
+    session_token: Optional[str] = Cookie(None)
+):
+    """Soumet un feedback - Version simplifiée identique à l'ancien projet"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        data = await request.json()
+        
+        rating = int(data.get("rating", 0))
+        comment = data.get("comment", "")
+        issue_type = data.get("issue_type", "")
+        analysis_id = data.get("analysis_id", "current")
+        
+        # Utiliser la fonction simplifiée
+        from user_management import save_feedback
+        save_feedback(current_user["username"], rating, comment, issue_type, analysis_id)
+        
+        # Aussi logger dans les logs généraux
+        log_activity(current_user["username"], "FEEDBACK", 
+                    f"Rating: {rating}/5, Issue: {issue_type}")
+        
+        return {
+            "success": True,
+            "message": "Feedback submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
+
 @app.get("/api/feedback-stats")
 async def get_feedback_stats_api(session_token: Optional[str] = Cookie(None)):
     """Statistiques sur les feedbacks (admins seulement)"""
@@ -709,7 +728,7 @@ async def get_feedback_stats_api(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
-        # Utiliser la nouvelle fonction depuis SharePoint
+        from user_management import get_feedback_stats
         stats = get_feedback_stats()
         return {
             "success": True,
@@ -722,7 +741,7 @@ async def get_feedback_stats_api(session_token: Optional[str] = Cookie(None)):
             "success": False,
             "error": str(e)
         }
-
+    
 @app.post("/api/clear-logs")
 async def clear_all_logs_api(session_token: Optional[str] = Cookie(None)):
     """Nettoie tous les logs - ADMIN SEULEMENT"""
