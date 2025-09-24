@@ -94,7 +94,7 @@
         .main-grid {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 400px;
+            grid-template-columns: 60fr 40fr;
             grid-template-rows: 1fr;
             gap: 0;
             height: 100%;
@@ -107,53 +107,51 @@
             display: flex;
             flex-direction: column;
             border-right: 1px solid var(--border);
+            overflow: auto;
         }
 
         .analysis-header {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
-            padding: 2rem;
+            padding: 1.5rem 2rem;
             text-align: center;
-            position: relative;
+            flex-shrink: 0;
         }
 
-        .analysis-header::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 0;
-            right: 0;
-            height: 10px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            border-radius: 0 0 20px 20px;
-        }
-
-        .upload-zone {
+        .analysis-content-area {
             flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 2rem;
-            background: linear-gradient(45deg, #f8fafc, #f1f5f9);
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            overflow: auto;
+        }
+
+        .upload-section {
+            flex-shrink: 0;
         }
 
         .upload-card {
             background: white;
-            border-radius: 24px;
-            padding: 3rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            max-width: 100%;
             width: 100%;
             text-align: center;
             border: 2px dashed var(--border);
             transition: all 0.3s ease;
             cursor: pointer;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .upload-card:hover {
             border-color: var(--primary);
-            box-shadow: 0 25px 50px rgba(99, 102, 241, 0.15);
-            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.15);
+            transform: translateY(-2px);
         }
 
         .upload-card.drag-over {
@@ -163,7 +161,7 @@
         }
 
         .upload-icon {
-            font-size: 4rem;
+            font-size: 2.5rem;
             color: var(--primary);
             margin-bottom: 1rem;
             opacity: 0.8;
@@ -172,6 +170,141 @@
         .upload-card.drag-over .upload-icon {
             color: var(--success);
             animation: bounce 0.5s ease;
+        }
+
+        .question-section {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .question-input {
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem;
+            width: 100%;
+            resize: none;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .question-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            outline: none;
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            font-size: 1rem;
+            padding: 0.875rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .btn-analyze:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-analyze:disabled {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Zone de résultats simplifiée */
+        .results-section {
+            flex-shrink: 0;
+            margin-top: 1rem;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid var(--primary);
+            animation: slideInUp 0.4s ease-out;
+        }
+
+        .result-card.success {
+            border-left-color: var(--success);
+            background: linear-gradient(135deg, #f0fdf4, #ffffff);
+        }
+
+        .result-card.warning {
+            border-left-color: var(--warning);
+            background: linear-gradient(135deg, #fffbeb, #ffffff);
+        }
+
+        .result-card.danger {
+            border-left-color: var(--danger);
+            background: linear-gradient(135deg, #fef2f2, #ffffff);
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            margin-bottom: 1rem;
+        }
+
+        .result-icon {
+            font-size: 1.75rem;
+            margin-right: 1rem;
+        }
+
+        .result-content {
+            background: rgba(248, 250, 252, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            max-height: none;
+            overflow: visible;
+        }
+
+        .result-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Message d'état du ticket */
+        .ticket-status {
+            margin-top: 1rem;
+        }
+
+        .status-success {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .status-processing {
+            background: linear-gradient(135deg, #fefbeb, #fef3c7);
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .status-error {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            border: 1px solid #fca5a5;
+            color: #991b1b;
         }
 
         @keyframes bounce {
@@ -519,228 +652,6 @@
             border: 1px solid #fca5a5;
             color: #991b1b;
         }
-
-        .main-grid {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            grid-template-rows: 1fr;
-            gap: 0;
-            height: calc(100vh - 120px); /* Ajuster selon la hauteur header + status */
-            overflow: hidden;
-        }
-
-        /* Zone d'analyse avec scroll interne */
-        .ticket-analysis-zone {
-            background: white;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border);
-            overflow: hidden; /* Empêcher le débordement */
-        }
-
-        /* Zone d'upload avec hauteur fixe */
-        .upload-zone {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            background: linear-gradient(45deg, #f8fafc, #f1f5f9);
-            overflow-y: auto; /* Scroll si nécessaire */
-            min-height: 0; /* Permettre la compression */
-        }
-
-        /* Zone de résultats avec hauteur limitée et scroll */
-        .analysis-results {
-            padding: 1.5rem;
-            background: #f8fafc;
-            border-top: 1px solid var(--border);
-            max-height: 40vh; /* Limiter à 40% de la hauteur d'écran */
-            overflow-y: auto;
-            flex-shrink: 0; /* Ne pas rétrécir */
-        }
-
-        /* Card de résultat avec hauteur contrôlée */
-        .result-card {
-            background: white;
-            border-radius: 20px;
-            padding: 1.5rem; /* Réduire le padding */
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-            border-left: 4px solid var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        /* Contenu d'analyse avec hauteur limitée */
-        .analysis-content .collapse > div {
-            max-height: 150px !important; /* Limiter la hauteur du texte */
-            overflow-y: auto;
-        }
-
-        /* Notification flottante */
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        /* Améliorer l'upload card pour occuper moins d'espace vertical */
-        .upload-card {
-            background: white;
-            border-radius: 24px;
-            padding: 2rem; /* Réduire le padding */
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-            border: 2px dashed var(--border);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            max-height: 80vh; /* Limiter la hauteur */
-            overflow-y: auto;
-        }
-
-        /* Upload icon plus petit */
-        .upload-icon {
-            font-size: 3rem; /* Réduire de 4rem à 3rem */
-            color: var(--primary);
-            margin-bottom: 0.75rem; /* Réduire la marge */
-            opacity: 0.8;
-        }
-
-        /* Section question plus compacte */
-        .question-section {
-            background: white;
-            border-radius: 16px;
-            padding: 1rem; /* Réduire de 1.5rem à 1rem */
-            margin-top: 1rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Bouton analyse plus compact */
-        .btn-analyze {
-            background: linear-gradient(135deg, var(--success), #059669);
-            color: white;
-            font-size: 1rem; /* Réduire de 1.1rem */
-            padding: 0.75rem 1.5rem; /* Réduire le padding */
-            border-radius: 16px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 1rem; /* Réduire de 1.5rem */
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-
-        /* Sidebar chatbot avec scroll interne */
-        .chatbot-sidebar {
-            background: white;
-            display: flex;
-            flex-direction: column;
-            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
-        /* Container de chat avec hauteur fixe */
-        .chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            background: #f8fafc;
-            min-height: 0; /* Permettre la compression */
-        }
-
-        /* Responsive : ajuster pour mobile */
-        @media (max-width: 1200px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-                grid-template-rows: 1fr 50vh; /* Réduire la hauteur du chat sur mobile */
-                height: calc(100vh - 120px);
-            }
-            
-            .analysis-results {
-                max-height: 30vh; /* Moins d'espace sur mobile */
-            }
-            
-            .upload-card {
-                padding: 1.5rem 1rem;
-                max-height: 60vh;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .main-grid {
-                height: calc(100vh - 140px); /* Plus d'espace pour mobile */
-                grid-template-rows: 1fr 40vh;
-            }
-            
-            .analysis-results {
-                max-height: 25vh;
-                padding: 1rem;
-            }
-            
-            .result-card {
-                padding: 1rem;
-            }
-            
-            .upload-card {
-                padding: 1rem;
-                max-height: 50vh;
-            }
-            
-            .upload-icon {
-                font-size: 2.5rem;
-            }
-        }
-
-        /* Animation pour les résultats */
-        .result-card {
-            animation: slideInUp 0.5s ease-out;
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Bouton de retour en haut flottant */
-        .scroll-top-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
-            transition: all 0.3s ease;
-            opacity: 0;
-            transform: translateY(100px);
-        }
-
-        .scroll-top-btn.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .scroll-top-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
-        }
-
     </style>
 </head>
 <body>
@@ -807,50 +718,53 @@
             <!-- Zone d'analyse de tickets -->
             <div class="ticket-analysis-zone">
                 <div class="analysis-header">
-                    <h2 class="mb-2">
-                        <i class="fas fa-file-invoice-dollar me-3"></i>
+                    <h2 class="mb-1">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
                         Ticket Analysis Engine
                     </h2>
-                    <p class="mb-0 opacity-90">Upload your expense tickets for automated policy compliance analysis</p>
+                    <p class="mb-0 opacity-90">Upload and analyze your expense tickets for policy compliance</p>
                 </div>
 
-                <div class="upload-zone">
-                    <div class="upload-card" id="ticket-upload-area">
-                        <div class="upload-icon">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                        </div>
-                        <h3 class="mb-3">Drop Your Ticket Here</h3>
-                        <p class="text-muted mb-3">
-                            Drag and drop your expense ticket or click to browse
-                        </p>
-                        <div class="supported-formats">
-                            <span class="file-type-badge">PDF</span>
-                            <span class="file-type-badge">Images</span>
-                            <span class="file-type-badge">Word</span>
-                            <span class="file-type-badge">Excel</span>
-                            <span class="file-type-badge">Text</span>
-                        </div>
+                <div class="analysis-content-area">
+                    <!-- Section Upload -->
+                    <div class="upload-section">
+                        <div class="upload-card" id="ticket-upload-area">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h4 class="mb-2">Drop Your Ticket Here</h4>
+                            <p class="text-muted mb-3">
+                                Drag and drop your expense ticket or click to browse
+                            </p>
+                            <div class="supported-formats">
+                                <span class="file-type-badge">PDF</span>
+                                <span class="file-type-badge">Images</span>
+                                <span class="file-type-badge">Word</span>
+                                <span class="file-type-badge">Excel</span>
+                            </div>
 
-                        <div class="question-section">
-                            <label class="form-label fw-semibold">
-                                <i class="fas fa-question-circle me-2"></i>
-                                Specific Question (Optional)
-                            </label>
-                            <textarea id="question-input" class="question-input" rows="2" 
-                                placeholder="e.g., Is this expense within policy limits? What's the approval threshold?"></textarea>
+                            <div class="question-section">
+                                <label class="form-label fw-semibold mb-2">
+                                    <i class="fas fa-question-circle me-1"></i>
+                                    Specific Question (Optional)
+                                </label>
+                                <textarea id="question-input" class="question-input" rows="2" 
+                                    placeholder="e.g., Is this expense within policy limits? What's the approval threshold?"></textarea>
+                            </div>
+
+                            <button class="btn-analyze" id="analyze-btn" onclick="analyzeTicket()" disabled>
+                                <i class="fas fa-magic me-2"></i>
+                                Analyze Ticket
+                            </button>
+
+                            <div id="ticket-status" class="ticket-status"></div>
                         </div>
-
-                        <button class="btn-analyze" id="analyze-btn" onclick="analyzeTicket()" disabled>
-                            <i class="fas fa-magic me-2"></i>
-                            Analyze Ticket
-                        </button>
-
-                        <div id="ticket-status" class="ticket-status"></div>
                     </div>
-                </div>
 
-                <div class="analysis-results" id="analysis-results" style="display: none;">
-                    <div id="result-content"></div>
+                    <!-- Section Résultats -->
+                    <div class="results-section" id="analysis-results" style="display: none;">
+                        <div id="result-content"></div>
+                    </div>
                 </div>
             </div>
 
