@@ -8,160 +8,313 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
+
     <style>
         :root {
-            --natixis-blue: #76279b;
-            --natixis-light-blue: #ab54d4;
-            --natixis-very-light-blue: #D3A5E9;
-            --natixis-green: #00a651;
-            --natixis-orange: #ff6600;
-            --natixis-gray: #f5f5f5;
-            --success-green: #28a745;
-            --danger-red: #dc3545;
-            --warning-orange: #fd7e14;
-            --light-gray: #f8f9fa;
-            --border-color: #e0e6ed;
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --border: #e2e8f0;
         }
 
         body {
-            background: #f2f0f0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         .main-container {
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-            margin: 20px auto;
-            max-width: 1800px;
-            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            margin: 2rem auto;
+            max-width: 1400px;
         }
 
         .navbar-custom {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            margin: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            margin: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             padding: 1rem 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-
-        .navbar-logo { height: 40px; margin-right: 15px; }
 
         .documents-status {
-            background: var(--natixis-very-light-blue);
-            border-radius: 15px;
-            padding: 1.5rem;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 1px solid #bae6fd;
+            border-radius: 20px;
+            padding: 2rem;
             margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
         }
+
+        .documents-status::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+        }
+
         .documents-status.loaded {
-            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border-color: #bbf7d0;
         }
 
-        .bg-primary {
-            background-color: var(--natixis-blue) !important;
+        .chatbot-section {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+            overflow: hidden;
         }
 
-        .bg-secondary {
-            background-color: var(--natixis-very-light-blue) !important;
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem;
+            position: relative;
         }
 
-        .btn-pill { border-radius: 9999px; padding: .35rem .75rem; }
-        .btn-soft-primary{ background: rgba(118,39,155,.08); color: var(--natixis-blue); border:1px solid rgba(118,39,155,.15); }
-        .btn-soft-primary:hover{ background: rgba(118,39,155,.15); }
-        .btn-soft-secondary{ background: rgba(171,84,212,.08); color: var(--natixis-light-blue); border:1px solid rgba(171,84,212,.15); }
-        .btn-soft-secondary:hover{ background: rgba(171,84,212,.15); }
+        .chat-header::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 0 0 24px 24px;
+        }
 
-        .chatbot-section { background: white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin: 2rem 0; }
-        .chat-header { background: var(--natixis-blue); color: white; border-radius: 15px 15px 0 0; padding: 1.5rem; }
-        .chat-container { height: 500px; overflow-y: auto; padding: 1.5rem; background: var(--light-gray); border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
-        .chat-message { margin-bottom: 1rem; padding: 1rem; border-radius: 15px; max-width: 85%; }
-        .chat-message.user { background: linear-gradient(135deg, var(--natixis-blue), var(--natixis-light-blue)); color: white; margin-left: auto; text-align: right; }
-        .chat-message.assistant { background: white; border: 1px solid var(--border-color); margin-right: auto; }
-
-        .chat-input-area { padding: 1.5rem; background: white; border-radius: 0 0 15px 15px; border-top: 1px solid var(--border-color); }
-        .chat-input { border: 2px solid var(--natixis-light-blue); border-radius: 25px; padding: 12px 20px; }
-        .btn-chat { background: var(--natixis-blue); border: none; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
-
-        .word-document-viewer { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-family: 'Times New Roman', serif; line-height: 1.6; }
-        .word-section { margin-bottom: 2rem; }
-        .section-title { color: var(--natixis-blue) !important; font-weight: 600; margin-bottom: 1rem; }
-        .section-content { text-align: justify; color: #333; }
-
-        /* Upload de tickets */
-        .ticket-upload-area {
-            border: 2px dashed var(--natixis-light-blue);
-            border-radius: 15px;
+        .chat-container {
+            height: 500px;
+            overflow-y: auto;
             padding: 1.5rem;
+            background: #f8fafc;
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+        }
+
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 18px;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .chat-message.user {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 6px;
+        }
+
+        .chat-message.assistant {
+            background: white;
+            border: 1px solid var(--border);
+            margin-right: auto;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-input-area {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input {
+            border: 2px solid var(--border);
+            border-radius: 25px;
+            padding: 12px 20px;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .btn-chat {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-chat:hover {
+            transform: scale(1.05);
+        }
+
+        .ticket-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            padding: 2rem;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: white;
-            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fefefe, #f8fafc);
+            margin-bottom: 1.5rem;
         }
 
         .ticket-upload-area:hover {
-            border-color: var(--natixis-green);
-            background: rgba(0, 166, 81, 0.05);
+            border-color: var(--primary);
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
             transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
         }
 
         .ticket-upload-area.drag-over {
-            border-color: var(--natixis-green) !important;
-            background: rgba(0, 166, 81, 0.1) !important;
+            border-color: var(--success) !important;
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
             transform: scale(1.02);
         }
 
-        .ticket-upload-area i {
-            display: block;
-            font-size: 2rem;
-            color: var(--natixis-light-blue);
-            margin-bottom: 0.5rem;
-        }
-
-        .ticket-upload-area:hover i {
-            color: var(--natixis-green);
-        }
-
-        .ticket-upload-area p {
-            margin-bottom: 0.25rem;
+        .btn-modern {
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
             font-weight: 500;
-            color: #333;
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
         }
 
-        .ticket-upload-area small {
-            color: #666;
-            font-size: 0.875rem;
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
         }
 
         .spinner-custom {
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            border: 2px solid var(--natixis-light-blue);
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 3px solid #e2e8f0;
             border-radius: 50%;
-            border-top-color: transparent;
+            border-top-color: var(--primary);
             animation: spin 1s linear infinite;
         }
 
         @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
 
-        /* Améliorer l'affichage des alertes d'analyse */
         .analysis-loading {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb) !important;
-            border-left: 4px solid var(--natixis-blue) !important;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe) !important;
+            border: 1px solid #bae6fd !important;
+            border-left: 4px solid var(--primary) !important;
+            border-radius: 16px !important;
         }
 
         .analysis-result {
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 16px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+            border: none !important;
+            overflow: hidden;
         }
 
+        .analysis-result .alert-success {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
+            border-left: 4px solid var(--success) !important;
+        }
+
+        .analysis-result .alert-warning {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7) !important;
+            border-left: 4px solid var(--warning) !important;
+        }
+
+        .card {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-bottom: 1px solid var(--border);
+            border-radius: 20px 20px 0 0 !important;
+            padding: 1.25rem 1.5rem;
+        }
+
+        .badge {
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 0.375rem 0.75rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: #f0f9ff;
+        }
+
+        #analyze-btn {
+            border-radius: 16px !important;
+            padding: 1rem !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            transition: all 0.3s ease !important;
+        }
+
+        #analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        #analyze-btn:disabled {
+            background: #6c757d !important;
+            border-color: #6c757d !important;
+            opacity: 0.6;
+            transform: none !important;
+        }
+
+        .sidebar-section {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -208,13 +361,14 @@
                     </div>
                     <div class="col-md-6 text-end">
                         {% if te_documents.load_status == 'loaded' %}
-                        <div class="btn-group gap-1">
-                            <button class="btn btn-soft-primary btn-pill btn-sm" onclick="viewExcelDocument()">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm btn-modern" onclick="viewExcelDocument()">
                                 <i class="fas fa-table me-1"></i> Excel
                             </button>
-                            <button class="btn btn-soft-secondary btn-pill btn-sm" onclick="viewWordDocument()">
+                            <button class="btn btn-outline-secondary btn-sm btn-modern" onclick="viewWordDocument()">
                                 <i class="fas fa-file-word me-1"></i> Word
                             </button>
+                        </div>
                         </div>
                         {% endif %}
                     </div>
@@ -271,7 +425,7 @@
                                     
                                     <div class="ticket-upload-area mb-3" id="ticket-upload-area" 
                                         onclick="document.getElementById('ticket-upload').click()">
-                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--natixis-light-blue);"></i>
+                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--primary);"></i>
                                         <p class="mb-0">Drop tickets here or click to upload</p>
                                         <small class="text-muted">PDF, Images, Word, Excel, Text files</small>
                                     </div>

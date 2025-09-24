@@ -305,6 +305,92 @@ async def load_te_documents(
         logger.error(f"Erreur chargement documents T&E: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading T&E documents: {str(e)}")
     
+
+@app.get("/api/view-excel")
+async def view_excel_document(session_token: Optional[str] = Cookie(None)):
+    """Visualise le document Excel chargé"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["excel_rules"]:
+        raise HTTPException(status_code=404, detail="No Excel document loaded")
+    
+    try:
+        # Convertir les règles en format d'affichage
+        sheets = {}
+        for sheet_name, rules in te_documents["excel_rules"].items():
+            if rules:
+                # Créer les colonnes et lignes pour l'affichage
+                columns = ['Country', 'Currency', 'Type', 'Amount Limit']
+                rows = []
+                for rule in rules:
+                    rows.append([
+                        rule.get('country', 'N/A'),
+                        rule.get('currency', 'N/A'), 
+                        rule.get('type', 'N/A'),
+                        rule.get('amount_limit', 0)
+                    ])
+                
+                sheets[sheet_name] = {
+                    'columns': columns,
+                    'rows': rows
+                }
+        
+        return {
+            "success": True,
+            "filename": "Consolidated Limits.xlsx",
+            "sheets": sheets,
+            "total_rules": sum(len(rules) for rules in te_documents["excel_rules"].values()),
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Excel: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Excel: {str(e)}")
+
+@app.get("/api/view-word")  
+async def view_word_document(session_token: Optional[str] = Cookie(None)):
+    """Visualise le document Word chargé"""
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if not te_documents["word_policies"]:
+        raise HTTPException(status_code=404, detail="No Word document loaded")
+    
+    try:
+        # Diviser le texte en sections pour l'affichage
+        text = te_documents["word_policies"]
+        sections = []
+        
+        # Diviser par paragraphes
+        paragraphs = text.split('\n\n')
+        current_section = {"title": "T&E Policies", "content": ""}
+        
+        for para in paragraphs[:50]:  # Limiter à 50 paragraphes
+            if len(para.strip()) > 0:
+                if len(current_section["content"]) > 2000:  # Nouvelle section tous les 2000 chars
+                    sections.append(current_section)
+                    current_section = {"title": f"Section {len(sections) + 1}", "content": para}
+                else:
+                    current_section["content"] += "\n\n" + para
+        
+        if current_section["content"]:
+            sections.append(current_section)
+        
+        return {
+            "success": True,
+            "filename": "APAC Travel Entertainment Procedure.docx",
+            "sections": sections,
+            "total_sections": len(sections),
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur visualisation Word: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
+    
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
     ticket_file: UploadFile = File(...),

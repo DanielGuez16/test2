@@ -275,52 +275,53 @@ function clearChat() {
 // ===== UPLOAD ET ANALYSE DE TICKETS =====
 
 function handleTicketUpload(file) {
+    console.log('=== handleTicketUpload called ===');
+    console.log('File:', file ? file.name : 'null');
+    
     if (!file) {
-        console.log('Aucun fichier fourni');
+        console.log('No file provided, exiting');
         return;
     }
     
-    console.log('Upload de ticket:', file.name, file.type, file.size);
-    
-    // Vérifications de base
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'text/plain'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|jpg|jpeg|png|txt|doc|docx)$/i)) {
-        alert('Type de fichier non supporté. Utilisez PDF, images ou documents.');
-        return;
-    }
-    
+    // Vérifications
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        alert('Fichier trop volumineux. Maximum 10MB.');
+        alert('File too large. Maximum 10MB.');
         return;
     }
     
     currentTicketFile = file;
+    console.log('File stored:', currentTicketFile.name);
     
-    // Mettre à jour l'interface immédiatement
+    // Interface moderne
     const ticketStatus = document.getElementById('ticket-status');
     if (ticketStatus) {
         ticketStatus.innerHTML = `
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle me-2"></i>
-                <strong>Fichier chargé:</strong><br>
-                ${file.name}<br>
-                <small>${formatFileSize(file.size)}</small>
+            <div class="alert alert-success analysis-result">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-file-check" style="font-size: 1.5rem; color: var(--success);"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">File Ready</h6>
+                        <p class="mb-0 text-muted">${file.name}</p>
+                        <small class="text-muted">${formatFileSize(file.size)}</small>
+                    </div>
+                </div>
             </div>
         `;
     }
     
-    // Activer le bouton d'analyse
+    // Bouton moderne activé
     const analyzeBtn = document.getElementById('analyze-btn');
     if (analyzeBtn) {
         analyzeBtn.disabled = false;
         analyzeBtn.classList.remove('btn-secondary');
-        analyzeBtn.classList.add('btn-success');
-        console.log('Bouton analyse activé');
+        analyzeBtn.classList.add('btn-success', 'btn-modern');
+        analyzeBtn.innerHTML = '<i class="fas fa-sparkles me-2"></i>Analyze Ticket';
     }
-
 }
+
 
 async function analyzeTicket() {
     if (!currentTicketFile) {
@@ -419,7 +420,8 @@ function displaySingleAnalysisResult(result) {
     
     if (!result.success) {
         container.innerHTML = `
-            <div class="alert alert-danger">
+            <div class="alert alert-danger analysis-result">
+                <i class="fas fa-exclamation-triangle me-2"></i>
                 <strong>Analysis Failed:</strong> ${result.detail || 'Unknown error'}
             </div>
         `;
@@ -429,46 +431,52 @@ function displaySingleAnalysisResult(result) {
     const analysis = result.analysis_result;
     const ticket = result.ticket_info;
     
-    // Déterminer le statut CSS
     const isPass = analysis.result === 'PASS';
     const statusClass = isPass ? 'success' : 'warning';
     const statusIcon = isPass ? 'check-circle' : 'exclamation-triangle';
     
     container.innerHTML = `
-        <div class="alert alert-${statusClass} analysis-result">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <h5 class="mb-1">
-                        <i class="fas fa-${statusIcon} me-2"></i>
-                        ${analysis.result}
-                    </h5>
-                    <span class="badge bg-${isPass ? 'success' : 'warning'}">${analysis.expense_type}</span>
+        <div class="analysis-result">
+            <div class="alert alert-${statusClass}">
+                <div class="row align-items-center mb-3">
+                    <div class="col">
+                        <h4 class="mb-0">
+                            <i class="fas fa-${statusIcon} me-2"></i>
+                            ${analysis.result}
+                        </h4>
+                        <p class="mb-0 mt-1 text-muted">
+                            <strong>${ticket.filename}</strong> • ${analysis.expense_type}
+                        </p>
+                    </div>
+                    <div class="col-auto">
+                        <div class="badge bg-light text-dark px-3 py-2">
+                            ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
+                        </div>
+                    </div>
                 </div>
-                <div class="text-end">
-                    <small class="text-muted">${ticket.filename}</small><br>
-                    <span class="badge bg-light text-dark">
-                        ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
-                    </span>
+                
+                <div class="analysis-content">
+                    <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.7); border-left: 4px solid ${isPass ? 'var(--success)' : 'var(--warning)'};">
+                        ${formatAIResponse(analysis.justification)}
+                    </div>
                 </div>
-            </div>
-            
-            <div class="analysis-content">
-                <div class="p-3 rounded" style="background: rgba(255,255,255,0.8); border-left: 4px solid var(--natixis-blue);">
-                    ${formatAIResponse(analysis.justification)}
+                
+                <div class="mt-3 d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-robot me-1"></i>
+                        AI Analysis completed
+                    </small>
+                    <button class="btn btn-outline-primary btn-sm btn-modern" onclick="showFeedbackModal()">
+                        <i class="fas fa-star me-1"></i> Rate Analysis
+                    </button>
                 </div>
-            </div>
-            
-            <div class="mt-3 text-end">
-                <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
-                    <i class="fas fa-star me-1"></i> Rate Analysis
-                </button>
             </div>
         </div>
     `;
     
-    // Ajouter à l'historique (une seule fois ici)
     addToRecentHistory(result);
 }
+
 // ===== GESTION DES DOCUMENTS T&E =====
 
 function showDocumentUpload() {
