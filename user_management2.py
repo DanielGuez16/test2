@@ -5,6 +5,7 @@ import json
 import os
 import pandas as pd
 from sharepoint_connector import SharePointClient
+from io import BytesIO
 
 SHAREPOINT_ANALYSIS_PATH = "Chatbot/logs/analysis_history.xlsx"
 SHAREPOINT_LOGS_PATH = "Chatbot/logs/activity_logs.xlsx"
@@ -58,7 +59,7 @@ def get_sharepoint_client():
     return SharePointClient()
 
 def log_activity(username: str, action: str, details: str = ""):
-    """COPIE EXACTE de user2.py - Version qui fonctionnait"""
+    """Version corrigée sans récursion SharePoint"""
     log_entry = {
         "timestamp": datetime.now().isoformat(),
         "username": username,
@@ -69,42 +70,52 @@ def log_activity(username: str, action: str, details: str = ""):
     try:
         client = get_sharepoint_client()
         
-        # Tenter de lire le fichier existant
+        # Essayer de lire le fichier existant directement en Excel
         try:
             binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
-            existing_data = client.read_excel_file_as_dict(binary_content)
-            logs_df = pd.DataFrame(existing_data)
-        except:
-            # Si le fichier n'existe pas, créer un DataFrame vide
+            # LIRE DIRECTEMENT AVEC PANDAS au lieu de read_excel_file_as_dict()
+            logs_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)  # Première feuille
+            
+            # Vérifier que les colonnes sont correctes
+            if list(logs_df.columns) != ["timestamp", "username", "action", "details"]:
+                print("Colonnes incorrectes, recréation du DataFrame")
+                logs_df = pd.DataFrame(columns=["timestamp", "username", "action", "details"])
+                
+        except Exception as e:
+            print(f"Création nouveau fichier logs: {e}")
+            # Créer un DataFrame vide avec les bonnes colonnes
             logs_df = pd.DataFrame(columns=["timestamp", "username", "action", "details"])
         
         # Ajouter le nouveau log
         new_log_df = pd.DataFrame([log_entry])
         logs_df = pd.concat([logs_df, new_log_df], ignore_index=True)
         
-        # Limiter à 1000 logs maximum
+        # Limiter à 1000 logs
         if len(logs_df) > 1000:
             logs_df = logs_df.tail(1000)
         
-        # Sauvegarder dans SharePoint
-        client.save_dataframe_in_sharepoint(logs_df, SHAREPOINT_LOGS_PATH, False)
+        # SAUVEGARDER DIRECTEMENT AVEC PANDAS au lieu de save_dataframe_in_sharepoint()
+        excel_buffer = BytesIO()
+        logs_df.to_excel(excel_buffer, sheet_name='Sheet1', index=False)
+        excel_buffer.seek(0)
+        
+        # Utiliser la fonction write_binary_file au lieu de save_dataframe_in_sharepoint
+        client.write_binary_file(SHAREPOINT_LOGS_PATH, excel_buffer.getvalue())
         
         print(f"LOG: {username} - {action} - {details}")
         
     except Exception as e:
         print(f"ERREUR sauvegarde log SharePoint: {e}")
-        # Fallback vers le fichier local en cas d'erreur SharePoint
         _log_activity_fallback(username, action, details)
 
 def get_logs(limit: int = 100) -> List[Dict]:
-    """COPIE EXACTE de user2.py"""
+    """Version corrigée de lecture des logs"""
     try:
         client = get_sharepoint_client()
         binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
-        logs_data = client.read_excel_file_as_dict(binary_content)
         
-        # Convertir en DataFrame pour manipulation
-        logs_df = pd.DataFrame(logs_data)
+        # LIRE DIRECTEMENT AVEC PANDAS
+        logs_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)
         
         # Trier par timestamp et limiter
         if not logs_df.empty and 'timestamp' in logs_df.columns:
@@ -116,9 +127,8 @@ def get_logs(limit: int = 100) -> List[Dict]:
         
     except Exception as e:
         print(f"ERREUR lecture logs SharePoint: {e}")
-        # Fallback vers fichier local
         return _get_logs_fallback(limit)
-
+    
 def get_logs_stats() -> Dict:
     """COPIE EXACTE de user2.py"""
     try:
@@ -214,7 +224,7 @@ def _get_logs_stats_fallback() -> Dict:
 
 
 def save_feedback(username: str, rating: int, comment: str = "", issue_type: str = "", analysis_id: str = ""):
-    """Sauvegarde un feedback dans SharePoint Excel - Pattern identique aux logs"""
+    """Version corrigée pour les feedbacks"""
     feedback_entry = {
         "timestamp": datetime.now().isoformat(),
         "username": username,
@@ -227,61 +237,63 @@ def save_feedback(username: str, rating: int, comment: str = "", issue_type: str
     try:
         client = get_sharepoint_client()
         
-        # Tenter de lire le fichier existant
         try:
             binary_content = client.read_binary_file(SHAREPOINT_FEEDBACK_PATH)
-            existing_data = client.read_excel_file_as_dict(binary_content)
-            feedback_df = pd.DataFrame(existing_data)
-        except:
-            # Si le fichier n'existe pas, créer un DataFrame vide
+            # LECTURE DIRECTE AVEC PANDAS
+            feedback_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)
+            
+            if list(feedback_df.columns) != ["timestamp", "username", "rating", "comment", "issue_type", "analysis_id"]:
+                feedback_df = pd.DataFrame(columns=["timestamp", "username", "rating", "comment", "issue_type", "analysis_id"])
+                
+        except Exception as e:
             feedback_df = pd.DataFrame(columns=["timestamp", "username", "rating", "comment", "issue_type", "analysis_id"])
         
         # Ajouter le nouveau feedback
         new_feedback_df = pd.DataFrame([feedback_entry])
         feedback_df = pd.concat([feedback_df, new_feedback_df], ignore_index=True)
         
-        # Limiter à 500 feedbacks maximum
+        # Limiter à 500 feedbacks
         if len(feedback_df) > 500:
             feedback_df = feedback_df.tail(500)
         
-        # Sauvegarder dans SharePoint
-        client.save_dataframe_in_sharepoint(feedback_df, SHAREPOINT_FEEDBACK_PATH, False)
+        # SAUVEGARDE DIRECTE
+        excel_buffer = BytesIO()
+        feedback_df.to_excel(excel_buffer, sheet_name='Sheet1', index=False)
+        excel_buffer.seek(0)
+        client.write_binary_file(SHAREPOINT_FEEDBACK_PATH, excel_buffer.getvalue())
         
-        print(f"FEEDBACK: {username} - Rating {rating}/5 - {issue_type}")
+        print(f"FEEDBACK: {username} - Rating {rating}/5")
         
     except Exception as e:
         print(f"ERREUR sauvegarde feedback SharePoint: {e}")
-        # Fallback vers le fichier local
         _save_feedback_fallback(username, rating, comment, issue_type, analysis_id)
 
 def get_feedback_stats() -> Dict:
-    """Récupère les statistiques des feedbacks depuis SharePoint"""
+    """Version corrigée pour les stats feedback"""
     try:
         client = get_sharepoint_client()
         binary_content = client.read_binary_file(SHAREPOINT_FEEDBACK_PATH)
-        feedback_data = client.read_excel_file_as_dict(binary_content)
         
-        if not feedback_data:
+        # LECTURE DIRECTE AVEC PANDAS
+        feedback_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)
+        
+        if feedback_df.empty:
             return {"total_feedback": 0, "average_rating": 0.0, 
                    "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}, 
                    "common_issues": {}}
         
-        feedback_df = pd.DataFrame(feedback_data)
-        
-        # Calculer les stats
+        # Stats simples
         total_feedback = len(feedback_df)
-        ratings = pd.to_numeric(feedback_df.get('rating', []), errors='coerce').dropna()
-        average_rating = round(ratings.mean(), 2) if not ratings.empty else 0.0
+        ratings_list = [r for r in feedback_df.get('rating', []) if pd.notna(r) and 1 <= r <= 5]
+        average_rating = round(sum(ratings_list) / len(ratings_list), 2) if ratings_list else 0.0
         
-        # Distribution des ratings
         rating_distribution = {i: 0 for i in range(1, 6)}
-        for rating in ratings:
-            if 1 <= rating <= 5:
-                rating_distribution[int(rating)] += 1
+        for rating in ratings_list:
+            rating_distribution[int(rating)] += 1
         
-        # Issues communes
-        issue_counts = feedback_df.get('issue_type', pd.Series()).value_counts().to_dict()
-        common_issues = {k: v for k, v in issue_counts.items() if k and k != ""}
+        issues = [str(i) for i in feedback_df.get('issue_type', []) if pd.notna(i) and str(i).strip()]
+        from collections import Counter
+        common_issues = dict(Counter(issues))
         
         return {
             "total_feedback": total_feedback,
@@ -292,7 +304,8 @@ def get_feedback_stats() -> Dict:
         
     except Exception as e:
         print(f"ERREUR stats feedback SharePoint: {e}")
-        return _get_feedback_stats_fallback()
+        return _get_feedback_stats_fallback()  
+    
 
 # Fonctions de fallback pour les feedbacks
 FEEDBACK_FILE = "feedback_data.json"
@@ -370,7 +383,7 @@ def _get_feedback_stats_fallback() -> Dict:
 
 
 def save_analysis_history(username: str, ticket_filename: str, question: str, analysis_result: dict, ticket_info: dict):
-    """Sauvegarde une analyse dans l'historique SharePoint Excel - Pattern identique"""
+    """Version corrigée pour l'historique des analyses"""
     analysis_entry = {
         "timestamp": datetime.now().isoformat(),
         "username": username,
@@ -387,13 +400,17 @@ def save_analysis_history(username: str, ticket_filename: str, question: str, an
     try:
         client = get_sharepoint_client()
         
-        # Tenter de lire le fichier existant
         try:
             binary_content = client.read_binary_file(SHAREPOINT_ANALYSIS_PATH)
-            existing_data = client.read_excel_file_as_dict(binary_content)
-            analysis_df = pd.DataFrame(existing_data)
-        except:
-            # Si le fichier n'existe pas, créer un DataFrame vide
+            # LECTURE DIRECTE AVEC PANDAS
+            analysis_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)
+            
+            expected_columns = ["timestamp", "username", "ticket_filename", "question", 
+                              "result", "expense_type", "amount", "currency", "vendor", "confidence"]
+            if list(analysis_df.columns) != expected_columns:
+                analysis_df = pd.DataFrame(columns=expected_columns)
+                
+        except Exception as e:
             analysis_df = pd.DataFrame(columns=[
                 "timestamp", "username", "ticket_filename", "question", 
                 "result", "expense_type", "amount", "currency", "vendor", "confidence"
@@ -403,62 +420,60 @@ def save_analysis_history(username: str, ticket_filename: str, question: str, an
         new_analysis_df = pd.DataFrame([analysis_entry])
         analysis_df = pd.concat([analysis_df, new_analysis_df], ignore_index=True)
         
-        # Limiter à 1000 analyses maximum
+        # Limiter à 1000 analyses
         if len(analysis_df) > 1000:
             analysis_df = analysis_df.tail(1000)
         
-        # Sauvegarder dans SharePoint
-        client.save_dataframe_in_sharepoint(analysis_df, SHAREPOINT_ANALYSIS_PATH, False)
+        # SAUVEGARDE DIRECTE
+        excel_buffer = BytesIO()
+        analysis_df.to_excel(excel_buffer, sheet_name='Sheet1', index=False)
+        excel_buffer.seek(0)
+        client.write_binary_file(SHAREPOINT_ANALYSIS_PATH, excel_buffer.getvalue())
         
-        print(f"ANALYSIS: {username} - {ticket_filename} - {analysis_result.get('result', 'UNKNOWN')}")
+        print(f"ANALYSIS: {username} - {ticket_filename}")
         
     except Exception as e:
         print(f"ERREUR sauvegarde analysis SharePoint: {e}")
-        # Fallback vers le fichier local
         _save_analysis_fallback(username, ticket_filename, question, analysis_result, ticket_info)
 
 def get_analysis_history(limit: int = 100) -> List[Dict]:
-    """Récupère l'historique des analyses depuis SharePoint"""
+    """Version corrigée pour la lecture de l'historique"""
     try:
         client = get_sharepoint_client()
         binary_content = client.read_binary_file(SHAREPOINT_ANALYSIS_PATH)
-        analysis_data = client.read_excel_file_as_dict(binary_content)
         
-        if not analysis_data:
+        # LECTURE DIRECTE AVEC PANDAS
+        analysis_df = pd.read_excel(BytesIO(binary_content), sheet_name=0)
+        
+        if analysis_df.empty:
             return []
         
-        # Convertir en DataFrame
-        analysis_df = pd.DataFrame(analysis_data)
+        # Trier et limiter
+        analysis_df = analysis_df.sort_values('timestamp', ascending=False)
+        limited_df = analysis_df.head(limit)
         
-        # Trier par timestamp décroissant et limiter
-        if not analysis_df.empty and 'timestamp' in analysis_df.columns:
-            analysis_df = analysis_df.sort_values('timestamp', ascending=False)
-            limited_analysis = analysis_df.head(limit)
-            
-            # Reconstituer la structure attendue par le frontend
-            analyses = []
-            for _, row in limited_analysis.iterrows():
-                analysis = {
-                    "timestamp": row.get("timestamp", ""),
-                    "user": row.get("username", ""),
-                    "ticket_filename": row.get("ticket_filename", ""),
-                    "question": row.get("question", ""),
-                    "analysis_result": {
-                        "result": row.get("result", ""),
-                        "expense_type": row.get("expense_type", "")
-                    },
-                    "ticket_info": {
-                        "amount": row.get("amount", ""),
-                        "currency": row.get("currency", ""),
-                        "vendor": row.get("vendor", ""),
-                        "confidence": row.get("confidence", 0)
-                    }
+        # Reconstituer la structure pour le frontend
+        analyses = []
+        for _, row in limited_df.iterrows():
+            analysis = {
+                "timestamp": row.get("timestamp", ""),
+                "user": row.get("username", ""),
+                "ticket_filename": row.get("ticket_filename", ""),
+                "question": row.get("question", ""),
+                "analysis_result": {
+                    "result": row.get("result", ""),
+                    "expense_type": row.get("expense_type", "")
+                },
+                "ticket_info": {
+                    "amount": row.get("amount", ""),
+                    "currency": row.get("currency", ""),
+                    "vendor": row.get("vendor", ""),
+                    "confidence": row.get("confidence", 0)
                 }
-                analyses.append(analysis)
-            
-            return analyses
+            }
+            analyses.append(analysis)
         
-        return []
+        return analyses
         
     except Exception as e:
         print(f"ERREUR lecture analysis SharePoint: {e}")
