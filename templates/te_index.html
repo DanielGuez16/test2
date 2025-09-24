@@ -34,8 +34,8 @@
             background: white;
             border-radius: 20px;
             box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-            margin: 30px auto;
-            max-width: 1200px;
+            margin: 20px auto;
+            max-width: 1800px;
             backdrop-filter: blur(10px);
         }
 
@@ -57,6 +57,10 @@
         }
         .documents-status.loaded {
             background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+        }
+
+        .bg-primary {
+            background-color: var(--natixis-blue) !important;
         }
 
         .bg-secondary {
@@ -146,6 +150,7 @@
             <button class="btn btn-outline-danger btn-sm me-2" onclick="logout()">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
+            <span class="badge bg-primary">Chatbot T&E</span>
         </div>
     </div>
 
@@ -296,12 +301,13 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
-                                <h6>Supported Categories:</h6>
+                                <h6>Expense Limit Categories:</h6>
                                 <div class="d-flex flex-wrap gap-1">
                                     <span class="badge bg-primary">Hotels</span>
                                     <span class="badge bg-primary">Meals</span>
-                                    <span class="badge bg-primary">Transport</span>
-                                    <span class="badge bg-primary">Flights</span>
+                                    <span class="badge bg-primary">Breakfast</span>
+                                    <span class="badge bg-primary">Lunch</span>
+                                    <span class="badge bg-primary">Diner</span>
                                 </div>
                             </div>
                             
