@@ -1236,90 +1236,75 @@ function showAdminPanel() {
     }
 }
 
-
 async function loadAdminLogs() {
-    const logsDiv = document.getElementById('admin-logs');
-    if (!logsDiv) return;
-    
     try {
         const response = await fetch('/api/logs?limit=50');
         const result = await response.json();
         
         if (result.success) {
-            if (result.logs.length === 0) {
-                logsDiv.innerHTML = '<div class="alert alert-info">No activity logs found</div>';
-                return;
-            }
-            
-            let html = `
-                <div class="mb-3">
-                    <h6>Recent Activity Logs (${result.logs.length})</h6>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-sm">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-            
-            result.logs.reverse().forEach(log => {
-                html += `
-                    <tr>
-                        <td><small>${new Date(log.timestamp).toLocaleString()}</small></td>
-                        <td><span class="badge bg-primary">${log.username.split('@')[0]}</span></td>
-                        <td><strong>${log.action}</strong></td>
-                        <td><small>${log.details}</small></td>
-                    </tr>
-                `;
-            });
-            
-            html += '</tbody></table></div>';
-            logsDiv.innerHTML = html;
+            displayLogs(result.logs);
         }
-        
     } catch (error) {
         console.error('Error loading logs:', error);
-        logsDiv.innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
+        document.getElementById('logs-container').innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
     }
 }
 
-async function loadAdminUsers() {
-    const usersDiv = document.getElementById('admin-users');
-    if (!usersDiv) return;
+function displayLogs(logs) {
+    // Chercher le conteneur des logs ou créer une div après les stats
+    let logsContainer = document.getElementById('logs-table-container');
+    if (!logsContainer) {
+        logsContainer = document.createElement('div');
+        logsContainer.id = 'logs-table-container';
+        document.getElementById('logs-container').appendChild(logsContainer);
+    }
     
+    if (logs.length === 0) {
+        logsContainer.innerHTML = '<div class="alert alert-info">No activity logs found</div>';
+        return;
+    }
+    
+    let html = `
+        <h5>Recent Activity Logs</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    logs.reverse().forEach(log => {
+        html += `
+            <tr>
+                <td><small>${new Date(log.timestamp).toLocaleString()}</small></td>
+                <td><span class="badge bg-primary">${log.username.split('@')[0]}</span></td>
+                <td><strong>${log.action}</strong></td>
+                <td><small>${log.details}</small></td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    logsContainer.innerHTML = html;
+}
+
+async function loadAdminUsers() {
     try {
         const response = await fetch('/api/users');
         const result = await response.json();
         
         if (result.success) {
-            usersDiv.innerHTML = `
-                <div class="row">
-                    ${result.users.map(user => `
-                        <div class="col-md-6 mb-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">${user.full_name}</h6>
-                                    <p class="card-text">
-                                        <small class="text-muted">${user.username}</small><br>
-                                        <span class="badge bg-${user.role === 'admin' ? 'danger' : 'primary'}">${user.role}</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+            displayUsers(result.users);
         }
-        
     } catch (error) {
-        console.error('Error loading admin users:', error);
-        usersDiv.innerHTML = '<div class="alert alert-danger">Error loading users</div>';
+        console.error('Error loading users:', error);
+        document.getElementById('users-container').innerHTML = '<div class="alert alert-danger">Error loading users</div>';
     }
 }
 
