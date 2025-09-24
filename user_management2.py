@@ -11,7 +11,7 @@ from io import BytesIO
 
 
 # Configuration SharePoint pour les logs
-SHAREPOINT_LOGS_PATH = "ALM_Metrics/logs/activity_logs.xlsx"  # Ajustez selon votre structure
+SHAREPOINT_LOGS_PATH = "Chatbot/logs/activity_logs.xlsx" 
 
 
 
