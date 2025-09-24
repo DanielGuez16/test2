@@ -347,9 +347,17 @@ async def analyze_ticket(
         # 4. Analyse avec les règles
         analysis_result = analyzer.analyze_ticket(ticket_info, te_documents, question)
 
-        # Sauvegarder l'analyse
+        # 5. Préparer la réponse AVANT de sauvegarder
+        response_data = {
+            "success": True,
+            "ticket_info": ticket_info,
+            "analysis_result": analysis_result,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # 6. Sauvegarder UNE SEULE FOIS ici
         analysis_record = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": response_data["timestamp"],
             "user": current_user["username"],
             "ticket_filename": ticket_file.filename,
             "ticket_info": ticket_info,
@@ -359,12 +367,7 @@ async def analyze_ticket(
         
         chatbot_session["analysis_history"].append(analysis_record)
         
-        return {
-            "success": True,
-            "ticket_info": ticket_info,
-            "analysis_result": analysis_result,
-            "timestamp": analysis_record["timestamp"]
-        }
+        return response_data
         
     except Exception as e:
         logger.error(f"Erreur analyse ticket: {e}")

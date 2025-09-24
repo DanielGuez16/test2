@@ -25,7 +25,7 @@ class TicketAnalyzer:
         self.rag_system = rag_system
         self.llm_connector = llm_connector
         self.context_builder = TEContextBuilder()
-    
+
     def analyze_ticket(self, ticket_info: dict, te_documents: dict, user_question: str = "") -> dict:
         """Analyse complète d'un ticket T&E avec IA directe (sans RAG)"""
         logger.info(f"Début analyse ticket: {ticket_info.get('filename', 'N/A')}")
@@ -46,43 +46,28 @@ class TicketAnalyzer:
             - Location: {ticket_info.get('location', 'Not detected')}
 
             ANALYSIS REQUIREMENTS:
-            1. Search the CONSOLIDATED LIMITS above for exact matching rules (country(continent/region)/currency/type)
+            1. Search the CONSOLIDATED LIMITS above for exact matching rules (country/currency/type)
             2. Compare the ticket amount against the CONSOLIDATED LIMITS
             3. Extract relevant policy content from the TRAVEL & ENTERTAINMENT PROCEDURES if applicable
-            4. Provide PASS or FAIL decision with specific reasoning. There must always be a part of the answer that explains why it is PASS or FAIL this way : Result: PASS or Result: FAIL
+            4. Provide PASS or FAIL decision with specific reasoning
             5. Quote the exact rule or policy section that applies
-            6. Extract and explain the actual content from relevant sections to justify the answers
-            7. NEVER say 'refer to section X' without explaining what that section contains
-            8. Give precise answers with specific numbers, currencies, and details
-            9. Give specific recommendations if non-compliant
-
+            6. Give precise answers with specific numbers, currencies, and details
+            7. Give specific recommendations if non-compliant
             
-            FORMAT YOUR RESPONSE:
-            - Result: PASS or FAIL
-            - Expense Type: [Hotel/Meal/Breakfast/Transport/etc.]
-            - Applied Rules: [Exact rule from CONSOLIDATED LIMITS : Country, Currency, Type, Limit]
-            - Policy Extract: [Relevant content from TRAVEL & ENTERTAINMENT PROCEDURES if applicable]
-            - Justification: [Specific reasoning with numbers]
-            - Recommendation: [Action needed if any]
-
-            Be brief, precise, factual, and cite exact data from the knowledge base above.
-
+            Provide a professional business analysis in paragraph format.
             """
             
             # Appel direct à l'IA avec contexte complet
             ai_response = self.llm_connector.get_llm_response(prompt, full_context)
-            print(ai_response)
             
-            # Parser la réponse pour extraire les éléments
-            result_info = self._parse_ai_analysis_response(ai_response, ticket_info)
-            
+            # Retourner la réponse brute de l'IA
             return {
-                'result': result_info['result'],
-                'expense_type': result_info['expense_type'],
-                'justification': result_info['justification'],
-                'comment': ai_response,
-                'confidence_score': 0.95,  # Haute confiance avec données complètes
-                'applied_rules': [],  # Plus besoin avec l'approche directe
+                'result': 'PASS' if 'PASS' in ai_response.upper() else 'FAIL',
+                'expense_type': self._extract_expense_type(ticket_info),
+                'justification': ai_response,  # Réponse complète de l'IA
+                'comment': ai_response,  # Même contenu
+                'confidence_score': 0.95,
+                'applied_rules': [],  # Pas besoin avec l'approche directe
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -91,11 +76,29 @@ class TicketAnalyzer:
             return {
                 'result': 'FAIL',
                 'expense_type': 'Analysis Error',
-                'justification': f'Technical error: {str(e)}',
+                'justification': f'Technical error during analysis: {str(e)}',
                 'comment': f"Error during analysis: {str(e)}",
                 'confidence_score': 0.0,
                 'timestamp': datetime.now().isoformat()
             }
+
+    def _extract_expense_type(self, ticket_info: dict) -> str:
+        """Extrait le type de dépense de manière simple"""
+        category = ticket_info.get('category', 'unknown').lower()
+        
+        mapping = {
+            'hotel': 'Hotel',
+            'accommodation': 'Hotel', 
+            'meal': 'Meal',
+            'restaurant': 'Meal',
+            'breakfast': 'Breakfast',
+            'lunch': 'Meal',
+            'dinner': 'Meal',
+            'transport': 'Transport',
+            'flight': 'Flight'
+        }
+        
+        return mapping.get(category, 'Unknown')
 
     def answer_general_question(self, user_question: str, te_documents: dict) -> dict:
         """Répond à une question générale avec contexte complet"""
@@ -379,33 +382,3 @@ class TicketAnalyzer:
         context_parts.append("=== END OF COMPLETE T&E DATA ===")
         
         return "\n".join(context_parts)
-
-    def _parse_ai_analysis_response(self, ai_response: str, ticket_info: dict) -> dict:
-        """Parse la réponse IA pour extraire les éléments structurés"""
-        
-        # Détection simple basée sur mots-clés
-        result = "FAIL"
-        if any(word in ai_response.upper() for word in ["PASS"]):
-            result = "PASS"
-        
-        expense_type = "Unknown"
-        if "hotel" in ai_response.lower():
-            expense_type = "Hotel"
-        elif "breakfast" in ai_response.lower():
-            expense_type = "Breakfast"
-        elif "meal" in ai_response.lower():
-            expense_type = "Meal"
-        
-        # Extraction de justification (premier paragraphe qui mentionne une limite)
-        justification = "Analysis based on complete T&E policies and rules"
-        lines = ai_response.split('\n')
-        for line in lines:
-            if any(word in line.lower() for word in ["limit", "rule", "policy", "exceed"]):
-                justification = line.strip()
-                break
-        
-        return {
-            'result': result,
-            'expense_type': expense_type,
-            'justification': justification
-        }

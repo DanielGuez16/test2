@@ -387,6 +387,33 @@ async function analyzeTicket() {
         return;
     }
     
+    // Afficher immédiatement la jauge de chargement
+    const container = document.getElementById('ticket-status');
+    container.innerHTML = `
+        <div class="alert alert-info">
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div>
+                    <strong>Analyzing ticket...</strong><br>
+                    <small>Processing ${currentTicketFile.name} with AI engine</small>
+                </div>
+            </div>
+            <div class="progress mt-2" style="height: 4px;">
+                <div class="progress-bar progress-bar-animated" 
+                     style="width: 100%; background-color: var(--natixis-blue);">
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Désactiver le bouton pendant l'analyse
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const originalText = analyzeBtn.innerHTML;
+    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
+    analyzeBtn.disabled = true;
+    
     const formData = new FormData();
     formData.append('ticket_file', currentTicketFile);
     
@@ -403,12 +430,24 @@ async function analyzeTicket() {
         if (data.success) {
             displaySingleAnalysisResult(data); 
         } else {
-            alert('Analysis failed: ' + data.detail);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Analysis Failed:</strong> ${data.detail || 'Unknown error'}
+                </div>
+            `;
         }
         
     } catch (error) {
         console.error('Erreur analyse:', error);
-        alert('Error during analysis: ' + error.message);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Error during analysis:</strong> ${error.message}
+            </div>
+        `;
+    } finally {
+        // Restaurer le bouton
+        analyzeBtn.innerHTML = originalText;
+        analyzeBtn.disabled = false;
     }
 }
 
@@ -428,28 +467,25 @@ function displaySingleAnalysisResult(result) {
     const ticket = result.ticket_info;
     
     // Déterminer le statut CSS
-    let statusClass = 'warning';
-    if (analysis.basic_validation?.is_valid) statusClass = 'success';
-    else if (analysis.basic_validation?.status === 'error') statusClass = 'danger';
+    const isPass = analysis.result === 'PASS';
+    const statusClass = isPass ? 'success' : 'warning';
+    const statusIcon = isPass ? 'check-circle' : 'exclamation-triangle';
     
     container.innerHTML = `
         <div class="alert alert-${statusClass}">
-            <h6><i class="fas fa-file me-2"></i>${ticket.filename}</h6>
-            <p><strong>Result:</strong> ${analysis.result || 'PENDING'}</p>
-            <p><strong>Expense Type:</strong> ${analysis.expense_type || 'Unknown'}</p>
-            <p><strong>Justification:</strong> ${analysis.justification || 'No justification available'}</p>
-            <p><strong>Comment:</strong> ${analysis.comment || 'No comment available'}</p>
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0">
+                    <i class="fas fa-${statusIcon} me-2"></i>
+                    Analysis Result: ${analysis.result}
+                </h6>
+                <span class="badge bg-${statusClass}">${analysis.expense_type}</span>
+            </div>
             
-            ${analysis.applied_rules?.length ? `
-                <details>
-                    <summary>Applied Rules (${analysis.applied_rules.length})</summary>
-                    <ul class="mb-0 mt-2">
-                        ${analysis.applied_rules.map(rule => 
-                            `<li>${rule.sheet_name}: ${rule.amount_limit} ${rule.currency}</li>`
-                        ).join('')}
-                    </ul>
-                </details>
-            ` : ''}
+            <div class="analysis-content mt-3">
+                <div style="background: white; padding: 1rem; border-radius: 8px; border-left: 4px solid var(--natixis-blue);">
+                    ${formatAIResponse(analysis.justification)}
+                </div>
+            </div>
         </div>
         
         <div class="mt-2 text-end">
@@ -457,16 +493,9 @@ function displaySingleAnalysisResult(result) {
                 <i class="fas fa-star me-1"></i> Rate this analysis
             </button>
         </div>
-
-        <div class="mt-2">
-            <h6>AI Analysis:</h6>
-            <div class="bg-light p-2 rounded">
-                ${analysis.comment || 'No AI response available'}
-            </div>
-        </div>
     `;
     
-    // Ajouter à l'historique
+    // Ajouter à l'historique (une seule fois ici)
     addToRecentHistory(result);
 }
 
