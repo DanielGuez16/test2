@@ -540,3 +540,23 @@ class TEDocumentProcessor:
         cleaned_text = '\n'.join(lines)
         
         return cleaned_text
+    
+
+if __name__ == "__main__":
+    # Chemin du fichier Excel
+    file_path = 'Consolidated Limits.xlsx'
+
+    # Lire le contenu du fichier Excel
+    with open(file_path, 'rb') as file:
+        excel_content = file.read()
+
+    # Instancier le processeur de document T&E
+    processor = TEDocumentProcessor()
+
+    # Appeler la méthode process_excel_rules
+    try:
+        rules_data = processor.process_excel_rules(excel_content, 'Consolidate_limits.xlsx')
+        # Afficher le résultat
+        print(rules_data)
+    except Exception as e:
+        print(f"Une erreur s'est produite : {e}")
