@@ -378,9 +378,7 @@ function handleTicketUpload(file) {
         analyzeBtn.classList.add('btn-success');
         console.log('Bouton analyse activé');
     }
-    
-    // Message dans le chat
-    addMessageToChat('assistant', `Fichier "${file.name}" chargé avec succès. Vous pouvez maintenant l'analyser.`);
+
 }
 
 async function analyzeTicket() {
@@ -650,12 +648,6 @@ function updateDocumentsStatus(loaded, lastLoaded) {
                         Documents loaded successfully
                         ${lastLoaded ? `(${formatDateTime(lastLoaded)})` : ''}
                     </p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-outline-primary" onclick="showDocumentUpload()">
-                        <i class="fas fa-sync me-2"></i>
-                        Reload Documents
-                    </button>
                 </div>
             </div>
         `;
