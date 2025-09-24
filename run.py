@@ -22,7 +22,6 @@ from pathlib import Path
 from datetime import datetime
 import tempfile
 import os
-import requests
 import json
 from typing import Dict, Any, Optional, List
 import hashlib
@@ -306,7 +305,43 @@ async def load_te_documents(
         logger.error(f"Erreur chargement documents T&E: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading T&E documents: {str(e)}")
     
-
+@app.post("/api/extract-ticket-info")
+async def extract_ticket_info_only(
+    ticket_file: UploadFile = File(...),
+    session_token: Optional[str] = Cookie(None)
+):
+    current_user = get_current_user_from_session(session_token)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        log_activity(current_user["username"], "TICKET_EXTRACTION", f"Extracting info from: {ticket_file.filename}")
+        
+        # 1. Extraire le texte du fichier (fonction existante)
+        ticket_content = await ticket_file.read()
+        text_info = extract_ticket_information(ticket_content, ticket_file.filename)
+        
+        if text_info.get("error") or not text_info.get("raw_text"):
+            return {
+                "success": False,
+                "error": "Could not extract text from file"
+            }
+        
+        # 2. Extraction IA uniquement
+        analyzer = TicketAnalyzer(rag_system, llm_connector)
+        ticket_info = analyzer.ai_extract_ticket_info(text_info["raw_text"], ticket_file.filename)
+        
+        return {
+            "success": True,
+            "ticket_info": ticket_info,
+            "raw_text_preview": text_info["raw_text"][:500],
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur extraction ticket info: {e}")
+        raise HTTPException(status_code=500, detail=f"Error extracting ticket info: {str(e)}")
+    
 @app.get("/api/view-excel")
 async def view_excel_document(session_token: Optional[str] = Cookie(None)):
     """Visualise le document Excel chargé"""
@@ -392,7 +427,6 @@ async def view_word_document(session_token: Optional[str] = Cookie(None)):
         logger.error(f"Erreur visualisation Word: {e}")
         raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
     
-
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
     ticket_file: UploadFile = File(...),
@@ -431,16 +465,6 @@ async def analyze_ticket(
         # 3. Extraction IA complète
         analyzer = TicketAnalyzer(rag_system, llm_connector)
         ticket_info = analyzer.ai_extract_ticket_info(text_info["raw_text"], ticket_file.filename)
-
-        extract_only = request.form.get('extract_only', 'false').lower() == 'true'
-        if extract_only:
-            return {
-                "success": True,
-                "ticket_info": ticket_info,
-                "raw_text_preview": text_info["raw_text"][:500] + "..." if len(text_info["raw_text"]) > 500 else text_info["raw_text"],
-                "extraction_only": True,
-                "timestamp": datetime.now().isoformat()
-            }
         
         # 4. Analyse avec les règles
         analysis_result = analyzer.analyze_ticket(ticket_info, te_documents, question)
