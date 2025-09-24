@@ -31,78 +31,69 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    console.log('T&E Chatbot initialized');
+    console.log('T&E Chatbot initialized with new interface');
     
     // Vérifier si l'utilisateur est connecté
-    if (!document.querySelector('.navbar-custom')) {
+    if (!document.querySelector('.header-fixed')) {
         window.location.href = '/';
         return;
     }
     
-    // Focus sur l'input de chat
+    // Focus sur l'input de chat si disponible
     const chatInput = document.getElementById('chat-input');
     if (chatInput) {
-        chatInput.focus();
+        setTimeout(() => chatInput.focus(), 500);
     }
     
-    // Charger l'historique récent
-    loadRecentHistory();
+    // Charger l'historique récent si la fonction existe
+    if (typeof loadRecentHistory === 'function') {
+        loadRecentHistory();
+    }
 }
 
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
-    // Upload de documents T&E
-    const excelInput = document.getElementById('excel-file');
-    const wordInput = document.getElementById('word-file');
-    
-    if (excelInput) {
-        excelInput.addEventListener('change', function() {
-            handleDocumentSelect(this, 'excel');
-        });
-    }
-    
-    if (wordInput) {
-        wordInput.addEventListener('change', function() {
-            handleDocumentSelect(this, 'word');
-        });
-    }
-    
-    // Boutons principaux
-    const sendBtn = document.querySelector('.btn-chat');
-    if (sendBtn) {
-        sendBtn.addEventListener('click', sendMessage);
-    }
-    
-    const analyzeBtn = document.getElementById('analyze-btn');
-    if (analyzeBtn) {
-        analyzeBtn.addEventListener('click', analyzeTicket);
-    }
-    
     // Upload de ticket
     const ticketUpload = document.getElementById('ticket-upload');
     if (ticketUpload) {
-        ticketUpload.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                handleTicketUpload(this.files[0]);
-            }
-        });
+        // Supprimer les anciens listeners pour éviter les doublons
+        ticketUpload.removeEventListener('change', handleTicketFileSelect);
+        ticketUpload.addEventListener('change', handleTicketFileSelect);
     }
     
-    // Chat input enter key
+    // Chat input avec auto-resize
     const chatInput = document.getElementById('chat-input');
     if (chatInput) {
         chatInput.addEventListener('keypress', handleChatKeyPress);
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
     }
     
-    // Drag & drop pour les zones d'upload
-    setupDragAndDrop();
-    
-    // Rating stars
-    setupRatingStars();
+    // Question input avec auto-resize
+    const questionInput = document.getElementById('question-input');
+    if (questionInput) {
+        questionInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+        });
+    }
     
     console.log('Event listeners setup complete');
 }
+
+function handleTicketFileSelect() {
+    const fileInput = document.getElementById('ticket-upload');
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        handleTicketUpload(fileInput.files[0]);
+    }
+}
+
+// 7. Ajouter variable globale isAnalyzing au début du fichier:
+// À ajouter après les autres variables globales existantes
+let isAnalyzing = false;
 
 function setupRatingStars() {
     const stars = document.querySelectorAll('#rating-stars .star');
@@ -278,103 +269,142 @@ function handleTicketUpload(file) {
     console.log('=== handleTicketUpload called ===');
     console.log('File:', file ? file.name : 'null');
     
-    if (!file) {
-        console.log('No file provided, exiting');
+    if (!file || isAnalyzing) {
+        console.log('No file provided or already analyzing, exiting');
         return;
     }
     
     // Vérifications
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        alert('File too large. Maximum 10MB.');
+        showTicketStatus('error', 'File too large. Maximum 10MB allowed.');
         return;
     }
     
     currentTicketFile = file;
     console.log('File stored:', currentTicketFile.name);
     
-    // Interface moderne
-    const ticketStatus = document.getElementById('ticket-status');
-    if (ticketStatus) {
-        ticketStatus.innerHTML = `
-            <div class="alert alert-success analysis-result">
-                <div class="d-flex align-items-center">
-                    <div class="me-3">
-                        <i class="fas fa-file-check" style="font-size: 1.5rem; color: var(--success);"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1">File Ready</h6>
-                        <p class="mb-0 text-muted">${file.name}</p>
-                        <small class="text-muted">${formatFileSize(file.size)}</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    // Mettre à jour l'interface (nouvelle fonction)
+    updateUploadUI(file);
     
-    // Bouton moderne activé
+    // Activer le bouton d'analyse
     const analyzeBtn = document.getElementById('analyze-btn');
     if (analyzeBtn) {
         analyzeBtn.disabled = false;
-        analyzeBtn.classList.remove('btn-secondary');
-        analyzeBtn.classList.add('btn-success', 'btn-modern');
-        analyzeBtn.innerHTML = '<i class="fas fa-sparkles me-2"></i>Analyze Ticket';
+        analyzeBtn.classList.remove('disabled');
+        analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
     }
+}
+
+function updateUploadUI(file) {
+    const uploadCard = document.getElementById('ticket-upload-area');
+    if (!uploadCard) return;
+    
+    // Mettre à jour l'icône
+    const uploadIcon = uploadCard.querySelector('.upload-icon i');
+    if (uploadIcon) {
+        uploadIcon.className = 'fas fa-file-check';
+        uploadIcon.style.color = 'var(--success)';
+    }
+    
+    // Mettre à jour le titre
+    const title = uploadCard.querySelector('h3');
+    if (title) {
+        title.textContent = 'File Ready for Analysis';
+    }
+    
+    // Mettre à jour la description
+    const description = uploadCard.querySelector('p');
+    if (description) {
+        description.innerHTML = `<strong>${file.name}</strong><br><small class="text-muted">${formatFileSize(file.size)}</small>`;
+    }
+    
+    // Afficher le statut
+    showTicketStatus('success', `File "${file.name}" loaded successfully`);
+}
+
+function resetUploadUI() {
+    const uploadCard = document.getElementById('ticket-upload-area');
+    if (!uploadCard) return;
+    
+    // Réinitialiser l'icône
+    const uploadIcon = uploadCard.querySelector('.upload-icon i');
+    if (uploadIcon) {
+        uploadIcon.className = 'fas fa-cloud-upload-alt';
+        uploadIcon.style.color = 'var(--primary)';
+    }
+    
+    // Réinitialiser le titre
+    const title = uploadCard.querySelector('h3');
+    if (title) {
+        title.textContent = 'Drop Your Ticket Here';
+    }
+    
+    // Réinitialiser la description
+    const description = uploadCard.querySelector('p');
+    if (description) {
+        description.innerHTML = 'Drag and drop your expense ticket or click to browse';
+    }
+}
+
+function showTicketStatus(type, message) {
+    const statusDiv = document.getElementById('ticket-status');
+    if (!statusDiv) return;
+    
+    const statusClass = `status-${type}`;
+    
+    statusDiv.innerHTML = `
+        <div class="alert ${statusClass} border-0 rounded-3 mt-2">
+            <i class="fas fa-info-circle me-2"></i>
+            ${message}
+        </div>
+    `;
 }
 
 
 async function analyzeTicket() {
-    if (!currentTicketFile) {
-        alert('Please upload a ticket first');
+    if (!currentTicketFile || isAnalyzing) {
+        console.log('Cannot analyze: no file or already analyzing');
         return;
     }
     
-    console.log('Starting ticket analysis...'); // Debug
+    console.log('Starting ticket analysis...'); 
     
-    // Afficher immédiatement la jauge de chargement améliorée
-    const container = document.getElementById('ticket-status');
-    container.innerHTML = `
-        <div class="alert alert-info analysis-loading">
-            <div class="d-flex align-items-center mb-2">
-                <div class="spinner-custom me-3"></div>
-                <div>
-                    <h6 class="mb-1">Analyzing Ticket...</h6>
-                    <small class="text-muted">Processing ${currentTicketFile.name}</small>
-                </div>
-            </div>
-            
-            <div class="progress" style="height: 6px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
-                     style="width: 100%; transition: width 2s ease;">
-                </div>
-            </div>
-            
-            <div class="mt-2">
-                <small class="text-muted">
-                    <i class="fas fa-cog fa-spin me-1"></i>
-                    AI engine processing document content...
-                </small>
-            </div>
-        </div>
-    `;
+    // Marquer comme en cours pour éviter les doubles clics
+    isAnalyzing = true;
     
-    // Désactiver le bouton pendant l'analyse
+    // Désactiver le bouton et afficher loading
     const analyzeBtn = document.getElementById('analyze-btn');
-    const originalText = analyzeBtn.innerHTML;
-    const originalDisabled = analyzeBtn.disabled;
+    if (analyzeBtn) {
+        analyzeBtn.innerHTML = '<div class="spinner-custom"></div><span class="ms-2">Analyzing...</span>';
+        analyzeBtn.disabled = true;
+        analyzeBtn.style.pointerEvents = 'none';
+    }
     
-    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
-    analyzeBtn.disabled = true;
-    analyzeBtn.style.pointerEvents = 'none'; // Empêcher les double-clics
+    // Afficher la zone de résultats avec loading
+    const resultsSection = document.getElementById('analysis-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'block';
+        resultsSection.innerHTML = `
+            <div class="loading-overlay">
+                <div class="spinner-custom"></div>
+                <div class="loading-text">AI is analyzing your ticket...</div>
+                <div class="progress-custom mt-3">
+                    <div class="progress-bar-custom" style="width: 100%;"></div>
+                </div>
+                <small class="text-muted mt-2">This may take a few moments</small>
+            </div>
+        `;
+    }
     
     try {
         const formData = new FormData();
         formData.append('ticket_file', currentTicketFile);
         
-        const question = document.getElementById('question-input').value;
+        const question = document.getElementById('question-input')?.value || '';
         formData.append('question', question);
         
-        console.log('Sending request to API...'); // Debug
+        console.log('Sending request to API...'); 
         
         const response = await fetch('/api/analyze-ticket', {
             method: 'POST',
@@ -383,98 +413,172 @@ async function analyzeTicket() {
 
         const data = await response.json();
         
-        console.log('API response received:', data.success); // Debug
+        console.log('API response received:', data.success); 
         
         if (data.success) {
-            displaySingleAnalysisResult(data); 
+            displayAnalysisResult(data); 
         } else {
-            container.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Analysis Failed:</strong> ${data.detail || 'Unknown error'}
-                </div>
-            `;
+            displayAnalysisError(data.detail || 'Analysis failed');
         }
         
     } catch (error) {
         console.error('Erreur analyse:', error);
-        container.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-times-circle me-2"></i>
-                <strong>Error:</strong> ${error.message}
-            </div>
-        `;
+        displayAnalysisError(error.message);
     } finally {
         // Restaurer le bouton avec un délai pour éviter les double-clics
         setTimeout(() => {
-            analyzeBtn.innerHTML = originalText;
-            analyzeBtn.disabled = originalDisabled;
-            analyzeBtn.style.pointerEvents = 'auto';
-            console.log('Analysis button restored'); // Debug
-        }, 500);
+            if (analyzeBtn) {
+                analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+                analyzeBtn.disabled = false;
+                analyzeBtn.style.pointerEvents = 'auto';
+            }
+            isAnalyzing = false;
+            console.log('Analysis completed, button restored'); 
+        }, 1000);
     }
 }
 
-function displaySingleAnalysisResult(result) {
-    const container = document.getElementById('ticket-status');
-    
-    if (!result.success) {
-        container.innerHTML = `
-            <div class="alert alert-danger analysis-result">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Analysis Failed:</strong> ${result.detail || 'Unknown error'}
-            </div>
-        `;
-        return;
-    }
+function displayAnalysisResult(result) {
+    const resultsSection = document.getElementById('analysis-results');
+    if (!resultsSection) return;
     
     const analysis = result.analysis_result;
     const ticket = result.ticket_info;
     
     const isPass = analysis.result === 'PASS';
     const statusClass = isPass ? 'success' : 'warning';
-    const statusIcon = isPass ? 'check-circle' : 'exclamation-triangle';
+    const statusIcon = isPass ? 'fa-check-circle' : 'fa-exclamation-triangle';
+    const statusColor = isPass ? 'var(--success)' : 'var(--warning)';
     
-    container.innerHTML = `
-        <div class="analysis-result">
-            <div class="alert alert-${statusClass}">
-                <div class="row align-items-center mb-3">
-                    <div class="col">
-                        <h4 class="mb-0">
-                            <i class="fas fa-${statusIcon} me-2"></i>
-                            ${analysis.result}
-                        </h4>
-                        <p class="mb-0 mt-1 text-muted">
-                            <strong>${ticket.filename}</strong> • ${analysis.expense_type}
-                        </p>
+    resultsSection.innerHTML = `
+        <div class="result-card ${statusClass}">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="result-icon" style="color: ${statusColor}; font-size: 2rem;">
+                        <i class="fas ${statusIcon}"></i>
                     </div>
-                    <div class="col-auto">
-                        <div class="badge bg-light text-dark px-3 py-2">
-                            ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
-                        </div>
+                    <div>
+                        <h4 class="mb-1">${analysis.result}</h4>
+                        <p class="text-muted mb-0">${analysis.expense_type}</p>
                     </div>
                 </div>
-                
-                <div class="analysis-content">
-                    <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.7); border-left: 4px solid ${isPass ? 'var(--success)' : 'var(--warning)'};">
-                        ${formatAIResponse(analysis.justification)}
+                <div class="text-end">
+                    <div class="badge bg-light text-dark px-3 py-2 fs-6">
+                        ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
                     </div>
                 </div>
-                
-                <div class="mt-3 d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        <i class="fas fa-robot me-1"></i>
-                        AI Analysis completed
-                    </small>
-                    <button class="btn btn-outline-primary btn-sm btn-modern" onclick="showFeedbackModal()">
+            </div>
+            
+            <div class="analysis-content">
+                <div class="p-3 rounded-3" style="background: rgba(248, 250, 252, 0.8); border-left: 4px solid ${statusColor};">
+                    ${formatAIResponse(analysis.justification)}
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-robot me-1"></i>
+                    Analysis completed • ${new Date().toLocaleTimeString()}
+                </small>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
                         <i class="fas fa-star me-1"></i> Rate Analysis
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="resetAnalysis()">
+                        <i class="fas fa-redo me-1"></i> New Analysis
                     </button>
                 </div>
             </div>
         </div>
     `;
     
-    addToRecentHistory(result);
+    // Scroll vers les résultats avec animation douce
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function displayAnalysisError(errorMessage) {
+    const resultsSection = document.getElementById('analysis-results');
+    if (!resultsSection) return;
+    
+    resultsSection.innerHTML = `
+        <div class="result-card danger">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="result-icon" style="color: var(--danger); font-size: 2rem;">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <div>
+                    <h4 class="mb-1">Analysis Failed</h4>
+                    <p class="text-muted mb-0">Unable to process the ticket</p>
+                </div>
+            </div>
+            
+            <div class="alert alert-danger border-0 rounded-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ${errorMessage}
+            </div>
+            
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" onclick="resetAnalysis()">
+                    <i class="fas fa-redo me-2"></i>
+                    Try Again
+                </button>
+                <button class="btn btn-outline-secondary" onclick="addMessageToChat('assistant', 'I encountered an issue analyzing your ticket. You can try uploading it again or ask me questions about T&E policies.')">
+                    <i class="fas fa-comments me-2"></i>
+                    Ask Assistant
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function resetAnalysis() {
+    currentTicketFile = null;
+    isAnalyzing = false;
+    
+    // Reset UI
+    resetUploadUI();
+    
+    // Cacher les résultats
+    const resultsSection = document.getElementById('analysis-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'none';
+    }
+    
+    // Reset bouton
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (analyzeBtn) {
+        analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+        analyzeBtn.disabled = true;
+    }
+    
+    // Reset question
+    const questionInput = document.getElementById('question-input');
+    if (questionInput) {
+        questionInput.value = '';
+        questionInput.style.height = 'auto';
+    }
+    
+    // Reset status
+    const ticketStatus = document.getElementById('ticket-status');
+    if (ticketStatus) {
+        ticketStatus.innerHTML = '';
+    }
+    
+    // Reset file input
+    const fileInput = document.getElementById('ticket-upload');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+}
+
+function displaySingleAnalysisResult(result) {
+    // Utiliser la nouvelle fonction displayAnalysisResult
+    displayAnalysisResult(result);
+    
+    // Ajouter à l'historique récent si la fonction existe
+    if (typeof addToRecentHistory === 'function') {
+        addToRecentHistory(result);
+    }
 }
 
 // ===== GESTION DES DOCUMENTS T&E =====
@@ -1373,9 +1477,8 @@ let selectedFiles = [];
 
 // Gestion drag & drop
 function setupDragAndDrop() {
-    console.log('Setting up drag and drop...'); // Debug pour voir si appelé plusieurs fois
+    console.log('Setting up drag and drop...');
     
-    // Zone upload ticket
     const ticketUploadArea = document.getElementById('ticket-upload-area');
     if (!ticketUploadArea) {
         console.log('Ticket upload area not found');
@@ -1390,39 +1493,55 @@ function setupDragAndDrop() {
     
     ticketUploadArea.setAttribute('data-drag-configured', 'true');
     
-    ticketUploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.classList.add('drag-over');
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        ticketUploadArea.addEventListener(eventName, preventDefaults, false);
     });
-    
-    ticketUploadArea.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        this.classList.remove('drag-over');
+
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        ticketUploadArea.addEventListener(eventName, highlight, false);
     });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        ticketUploadArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    // Handle dropped files
+    ticketUploadArea.addEventListener('drop', handleDrop, false);
     
-    ticketUploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.classList.remove('drag-over');
-        
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            console.log('File dropped:', files[0].name); // Debug
-            handleTicketUpload(files[0]);
+    // Handle click to browse files
+    ticketUploadArea.addEventListener('click', function(e) {
+        if (!isAnalyzing && !e.target.closest('textarea') && !e.target.closest('button')) {
+            document.getElementById('ticket-upload').click();
         }
     });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function highlight() {
+        ticketUploadArea.classList.add('drag-over');
+    }
+
+    function unhighlight() {
+        ticketUploadArea.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            handleTicketUpload(files[0]);
+        }
+    }
     
     console.log('Drag and drop configured successfully');
 }
 
-function handleMultipleTicketUpload(files) {
-    // Si plusieurs fichiers déposés, ne prendre que le premier
-    if (files && files.length > 0) {
-        if (files.length > 1) {
-            alert(`Seul le premier fichier sera traité (${files[0].name})`);
-        }
-        handleTicketUpload(files[0]);
-    }
-}
+
 
 function displaySelectedFiles() {
     const container = document.getElementById('ticket-status');
