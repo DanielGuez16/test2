@@ -498,33 +498,6 @@ function displaySingleAnalysisResult(result) {
     // Ajouter à l'historique (une seule fois ici)
     addToRecentHistory(result);
 }
-
-function displayAnalysisResults(results) {
-    const container = document.getElementById('ticket-status');
-    let html = '<div class="analysis-results">';
-    
-    results.forEach((result, index) => {
-        if (result.error) {
-            html += `
-                <div class="alert alert-warning mb-2">
-                    <strong>${result.filename}:</strong> ${result.error}
-                </div>
-            `;
-        } else {
-            html += `
-                <div class="analysis-result mb-3">
-                    <h6>${result.filename}</h6>
-                    <div class="result-content">
-                        <!-- Contenu de l'analyse -->
-                    </div>
-                </div>
-            `;
-        }
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
 // ===== GESTION DES DOCUMENTS T&E =====
 
 function showDocumentUpload() {
