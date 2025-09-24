@@ -195,6 +195,178 @@ function setupRatingStars() {
     }
 }
 
+// Fonction pour prévisualiser le ticket
+async function previewTicket() {
+    if (!currentTicketFile) {
+        alert('Please upload a ticket first');
+        return;
+    }
+    
+    const previewBtn = document.getElementById('preview-btn');
+    const originalText = previewBtn.innerHTML;
+    
+    try {
+        // Afficher le modal avec loading
+        const modal = new bootstrap.Modal(document.getElementById('ticketPreviewModal'));
+        modal.show();
+        
+        previewBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Extracting...';
+        previewBtn.disabled = true;
+        
+        // Préparer les données
+        const formData = new FormData();
+        formData.append('ticket_file', currentTicketFile);
+        
+        const response = await fetch('/api/ticket-preview', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayTicketPreview(data.ticket_info, data.extraction_confidence);
+        } else {
+            displayPreviewError(data.error || 'Failed to extract ticket information');
+        }
+        
+    } catch (error) {
+        console.error('Error previewing ticket:', error);
+        displayPreviewError(error.message);
+    } finally {
+        previewBtn.innerHTML = originalText;
+        previewBtn.disabled = false;
+    }
+}
+
+// Afficher l'aperçu stylisé du ticket
+function displayTicketPreview(ticketInfo, confidence) {
+    const content = document.getElementById('ticket-preview-content');
+    
+    // Déterminer le niveau de confiance
+    const confidenceLevel = confidence >= 0.8 ? 'high' : confidence >= 0.5 ? 'medium' : 'low';
+    const confidenceColor = confidence >= 0.8 ? 'success' : confidence >= 0.5 ? 'warning' : 'danger';
+    const confidenceText = confidence >= 0.8 ? 'High' : confidence >= 0.5 ? 'Medium' : 'Low';
+    
+    content.innerHTML = `
+        <div class="ticket-preview-container">
+            <!-- En-tête du ticket -->
+            <div class="ticket-header text-center mb-4">
+                <div class="ticket-logo mb-2">
+                    <i class="fas fa-receipt fa-3x text-primary"></i>
+                </div>
+                <h4 class="ticket-title">Expense Ticket</h4>
+                <div class="badge bg-${confidenceColor} mb-2">
+                    Extraction Confidence: ${confidenceText} (${Math.round(confidence * 100)}%)
+                </div>
+            </div>
+            
+            <!-- Corps du ticket -->
+            <div class="ticket-body">
+                <div class="row g-3">
+                    <!-- Montant principal -->
+                    <div class="col-12 text-center mb-4">
+                        <div class="amount-display">
+                            <div class="amount-label">Total Amount</div>
+                            <div class="amount-value">
+                                ${ticketInfo.amount ? `${ticketInfo.amount} ${ticketInfo.currency || 'EUR'}` : 'Not detected'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Détails en colonnes -->
+                    <div class="col-md-6">
+                        <div class="ticket-field">
+                            <div class="field-label">
+                                <i class="fas fa-calendar me-2"></i>Date
+                            </div>
+                            <div class="field-value">
+                                ${ticketInfo.date || 'Not detected'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="ticket-field">
+                            <div class="field-label">
+                                <i class="fas fa-store me-2"></i>Vendor
+                            </div>
+                            <div class="field-value">
+                                ${ticketInfo.vendor || 'Not detected'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="ticket-field">
+                            <div class="field-label">
+                                <i class="fas fa-tag me-2"></i>Category
+                            </div>
+                            <div class="field-value">
+                                <span class="badge bg-secondary">${ticketInfo.category || 'Unknown'}</span>
+                                ${ticketInfo.subcategory ? `<small class="text-muted ms-2">(${ticketInfo.subcategory})</small>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="ticket-field">
+                            <div class="field-label">
+                                <i class="fas fa-map-marker-alt me-2"></i>Location
+                            </div>
+                            <div class="field-value">
+                                ${ticketInfo.location || 'Not detected'}
+                                ${ticketInfo.country_code ? `<span class="badge bg-light text-dark ms-2">${ticketInfo.country_code}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pied de ticket -->
+            <div class="ticket-footer mt-4 pt-3 border-top">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <small class="text-muted">
+                            <i class="fas fa-file me-1"></i>
+                            Source: ${ticketInfo.filename}
+                        </small><br>
+                        <small class="text-muted">
+                            <i class="fas fa-robot me-1"></i>
+                            Extracted using AI • ${ticketInfo.extraction_method || 'ai_rag'}
+                        </small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <small class="text-muted">
+                            ${new Date().toLocaleDateString()}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Afficher les erreurs de preview
+function displayPreviewError(errorMessage) {
+    const content = document.getElementById('ticket-preview-content');
+    content.innerHTML = `
+        <div class="alert alert-danger">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                <div>
+                    <h6 class="alert-heading mb-1">Extraction Failed</h6>
+                    <p class="mb-0">${errorMessage}</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Exposer la fonction globalement
+window.previewTicket = previewTicket;
+
+
 function highlightStars(rating) {
     const stars = document.querySelectorAll('#rating-stars .star');
     stars.forEach((star, index) => {
@@ -375,6 +547,11 @@ function handleTicketUpload(file) {
         analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
     } else {
         console.error('Analyze button not found!');
+    }
+
+    const previewBtn = document.getElementById('preview-btn');
+    if (previewBtn) {
+        previewBtn.disabled = false;
     }
 }
 

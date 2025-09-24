@@ -305,8 +305,8 @@ async def load_te_documents(
         logger.error(f"Erreur chargement documents T&E: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading T&E documents: {str(e)}")
     
-@app.post("/api/extract-ticket-info")
-async def extract_ticket_info_only(
+@app.post("/api/ticket-preview")
+async def ticket_preview(
     ticket_file: UploadFile = File(...),
     session_token: Optional[str] = Cookie(None)
 ):
@@ -315,33 +315,34 @@ async def extract_ticket_info_only(
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        log_activity(current_user["username"], "TICKET_EXTRACTION", f"Extracting info from: {ticket_file.filename}")
+        log_activity(current_user["username"], "TICKET_PREVIEW", f"Preview ticket: {ticket_file.filename}")
         
-        # 1. Extraire le texte du fichier (fonction existante)
+        # Extraire le texte du fichier
         ticket_content = await ticket_file.read()
         text_info = extract_ticket_information(ticket_content, ticket_file.filename)
         
         if text_info.get("error") or not text_info.get("raw_text"):
             return {
                 "success": False,
-                "error": "Could not extract text from file"
+                "error": "Cannot extract text from this document"
             }
         
-        # 2. Extraction IA uniquement
+        # Extraction IA des données
         analyzer = TicketAnalyzer(rag_system, llm_connector)
         ticket_info = analyzer.ai_extract_ticket_info(text_info["raw_text"], ticket_file.filename)
         
         return {
             "success": True,
             "ticket_info": ticket_info,
-            "raw_text_preview": text_info["raw_text"][:500],
+            "extraction_confidence": ticket_info.get("confidence", 0.5),
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"Erreur extraction ticket info: {e}")
-        raise HTTPException(status_code=500, detail=f"Error extracting ticket info: {str(e)}")
+        logger.error(f"Erreur preview ticket: {e}")
+        raise HTTPException(status_code=500, detail=f"Error previewing ticket: {str(e)}")
     
+
 @app.get("/api/view-excel")
 async def view_excel_document(session_token: Optional[str] = Cookie(None)):
     """Visualise le document Excel chargé"""
