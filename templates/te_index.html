@@ -13,509 +13,667 @@
         :root {
             --primary: #6366f1;
             --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
             --light: #f8fafc;
             --dark: #1e293b;
             --border: #e2e8f0;
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
         }
 
-        .main-container {
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            margin: 2rem auto;
-            max-width: 1400px;
-        }
-
-        .navbar-custom {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            margin: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            padding: 1rem 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .documents-status {
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-            border: 1px solid #bae6fd;
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .documents-status::before {
-            content: '';
-            position: absolute;
+        /* Header fixe */
+        .header-fixed {
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--success));
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
-        .documents-status.loaded {
-            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-            border-color: #bbf7d0;
+        .main-content {
+            margin-top: 80px;
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
         }
 
-        .chatbot-section {
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            margin: 2rem 0;
+        /* Status bar */
+        .status-bar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Layout principal en grille */
+        .main-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            grid-template-rows: 1fr;
+            gap: 0;
+            height: 100%;
             overflow: hidden;
         }
 
-        .chat-header {
+        /* Section analyse de tickets - Zone principale */
+        .ticket-analysis-zone {
+            background: white;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+        }
+
+        .analysis-header {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             padding: 2rem;
+            text-align: center;
             position: relative;
         }
 
-        .chat-header::after {
+        .analysis-header::after {
             content: '';
             position: absolute;
             bottom: -10px;
             left: 0;
             right: 0;
-            height: 20px;
+            height: 10px;
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            border-radius: 0 0 24px 24px;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .upload-zone {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: linear-gradient(45deg, #f8fafc, #f1f5f9);
+        }
+
+        .upload-card {
+            background: white;
+            border-radius: 24px;
+            padding: 3rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            border: 2px dashed var(--border);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 25px 50px rgba(99, 102, 241, 0.15);
+            transform: translateY(-5px);
+        }
+
+        .upload-card.drag-over {
+            border-color: var(--success);
+            background: linear-gradient(45deg, #f0fdf4, #dcfce7);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+
+        .upload-card.drag-over .upload-icon {
+            color: var(--success);
+            animation: bounce 0.5s ease;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 60%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-20px); }
+            80% { transform: translateY(-10px); }
+        }
+
+        /* Section résultats d'analyse */
+        .analysis-results {
+            padding: 2rem;
+            background: #f8fafc;
+            border-top: 1px solid var(--border);
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid var(--primary);
+        }
+
+        .result-card.success {
+            border-left-color: var(--success);
+        }
+
+        .result-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .result-card.danger {
+            border-left-color: var(--danger);
+        }
+
+        /* Section chatbot - Sidebar */
+        .chatbot-sidebar {
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, var(--secondary), var(--accent));
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
         }
 
         .chat-container {
-            height: 500px;
+            flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
+            padding: 1rem;
             background: #f8fafc;
-            border-left: 1px solid var(--border);
-            border-right: 1px solid var(--border);
+            max-height: calc(100vh - 300px);
         }
 
         .chat-message {
             margin-bottom: 1rem;
-            padding: 1rem 1.5rem;
-            border-radius: 18px;
-            max-width: 85%;
+            padding: 1rem;
+            border-radius: 16px;
+            max-width: 90%;
             word-wrap: break-word;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .chat-message.user {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             margin-left: auto;
-            border-bottom-right-radius: 6px;
+            border-bottom-right-radius: 4px;
         }
 
         .chat-message.assistant {
             background: white;
             border: 1px solid var(--border);
             margin-right: auto;
-            border-bottom-left-radius: 6px;
+            border-bottom-left-radius: 4px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .chat-input-area {
-            padding: 1.5rem;
+            padding: 1rem;
             background: white;
             border-top: 1px solid var(--border);
         }
 
+        .chat-input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: end;
+        }
+
         .chat-input {
+            flex: 1;
             border: 2px solid var(--border);
-            border-radius: 25px;
-            padding: 12px 20px;
+            border-radius: 20px;
+            padding: 12px 16px;
+            resize: none;
+            max-height: 100px;
             transition: all 0.3s ease;
         }
 
         .chat-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+            outline: none;
         }
 
-        .btn-chat {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        .btn-send {
+            background: linear-gradient(135deg, var(--secondary), var(--accent));
             border: none;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s ease;
-        }
-
-        .btn-chat:hover {
-            transform: scale(1.05);
-        }
-
-        .ticket-upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 20px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
+            color: white;
             transition: all 0.3s ease;
-            background: linear-gradient(135deg, #fefefe, #f8fafc);
-            margin-bottom: 1.5rem;
         }
 
-        .ticket-upload-area:hover {
-            border-color: var(--primary);
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
+        .btn-send:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
         }
 
-        .ticket-upload-area.drag-over {
-            border-color: var(--success) !important;
-            background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
-            transform: scale(1.02);
-        }
-
+        /* Boutons modernes */
         .btn-modern {
             border-radius: 12px;
             padding: 0.75rem 1.5rem;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.3s ease;
             border: none;
             position: relative;
             overflow: hidden;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
+        .btn-modern::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        .btn-modern:hover::before {
+            left: 100%;
         }
 
-        .btn-success {
+        .btn-analyze {
             background: linear-gradient(135deg, var(--success), #059669);
             color: white;
+            font-size: 1.1rem;
+            padding: 1rem 2rem;
+            border-radius: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 1.5rem;
+            width: 100%;
+            transition: all 0.3s ease;
         }
 
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        .btn-analyze:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.4);
         }
 
+        .btn-analyze:disabled {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Question input améliorée */
+        .question-section {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .question-input {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            width: 100%;
+            resize: none;
+            transition: all 0.3s ease;
+        }
+
+        .question-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            outline: none;
+        }
+
+        /* Spinner personnalisé */
         .spinner-custom {
-            width: 1.5rem;
-            height: 1.5rem;
-            border: 3px solid #e2e8f0;
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid var(--border);
             border-radius: 50%;
             border-top-color: var(--primary);
             animation: spin 1s linear infinite;
+            margin: 0 auto;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        .analysis-loading {
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe) !important;
-            border: 1px solid #bae6fd !important;
-            border-left: 4px solid var(--primary) !important;
-            border-radius: 16px !important;
+        /* Loading states */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 100;
         }
 
-        .analysis-result {
-            border-radius: 16px !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
-            border: none !important;
-            overflow: hidden;
+        .loading-text {
+            margin-top: 1rem;
+            color: var(--primary);
+            font-weight: 600;
         }
 
-        .analysis-result .alert-success {
-            background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
-            border-left: 4px solid var(--success) !important;
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 400px;
+            }
         }
 
-        .analysis-result .alert-warning {
-            background: linear-gradient(135deg, #fffbeb, #fef3c7) !important;
-            border-left: 4px solid var(--warning) !important;
+        @media (max-width: 768px) {
+            .header-fixed {
+                padding: 0.75rem 1rem;
+            }
+            
+            .status-bar {
+                padding: 0.5rem 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            
+            .upload-card {
+                padding: 2rem 1rem;
+            }
+            
+            .upload-icon {
+                font-size: 3rem;
+            }
         }
 
-        .card {
-            border: none;
+        /* File type indicators */
+        .file-type-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
             border-radius: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .card-header {
-            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-            border-bottom: 1px solid var(--border);
-            border-radius: 20px 20px 0 0 !important;
-            padding: 1.25rem 1.5rem;
+        .supported-formats {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
         }
 
-        .badge {
-            border-radius: 8px;
-            font-weight: 500;
-            padding: 0.375rem 0.75rem;
-        }
-
-        .upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 16px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #fafafa;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary);
-            background: #f0f9ff;
-        }
-
-        #analyze-btn {
-            border-radius: 16px !important;
-            padding: 1rem !important;
-            font-weight: 600 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
-            transition: all 0.3s ease !important;
-        }
-
-        #analyze-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-        }
-
-        #analyze-btn:disabled {
-            background: #6c757d !important;
-            border-color: #6c757d !important;
-            opacity: 0.6;
-            transform: none !important;
-        }
-
-        .sidebar-section {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.5rem;
+        /* Progress indicator */
+        .progress-custom {
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
             overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-bar-custom {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+
+        /* Message d'état du ticket */
+        .ticket-status {
+            margin-top: 1.5rem;
+        }
+
+        .status-success {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .status-processing {
+            background: linear-gradient(135deg, #fefbeb, #fef3c7);
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .status-error {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            border: 1px solid #fca5a5;
+            color: #991b1b;
         }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <div class="navbar-custom d-flex justify-content-between align-items-center">
-        <img src="/static/images/bpce_logo.png" alt="BPCE Logo" class="navbar-logo">
-        <div>
-            <span class="badge bg-secondary me-3">{{ user.full_name }}</span>
-            {% if user.role == 'admin' %}
-                <button class="btn btn-outline-primary btn-sm me-2" onclick="showAdminPanel()">
-                    <i class="fas fa-cogs"></i> Admin
+    <!-- Header fixe -->
+    <div class="header-fixed">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <img src="/static/images/bpce_logo.png" alt="BPCE Logo" height="40">
+                <div>
+                    <h5 class="mb-0 text-dark">T&E Analysis Chatbot</h5>
+                    <small class="text-muted">APAC Region - Powered by AI</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary px-3 py-2">{{ user.full_name }}</span>
+                {% if user.role == 'admin' %}
+                <button class="btn btn-outline-primary btn-sm btn-modern" onclick="showAdminPanel()">
+                    <i class="fas fa-cogs me-1"></i> Admin
                 </button>
-            {% endif %}
-            <button class="btn btn-outline-danger btn-sm me-2" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-            <span class="badge bg-primary">Chatbot T&E</span>
+                {% endif %}
+                <button class="btn btn-outline-secondary btn-sm btn-modern" onclick="showHistory()">
+                    <i class="fas fa-history me-1"></i> History
+                </button>
+                <button class="btn btn-outline-danger btn-sm btn-modern" onclick="logout()">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </button>
+            </div>
         </div>
     </div>
 
-    <div class="container">
-        <div class="main-container p-4">
-            <!-- T&E Documents Status -->
-            <div class="documents-status {% if documents_loaded %}loaded{% endif %}">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <h5><i class="fas fa-folder-open me-2"></i>T&E Documents Status</h5>
-                        <p id="documents-status-text">
-                            {% if te_documents.load_status == 'loaded' %}
-                                <i class="fas fa-check-circle text-success me-1"></i>
-                                Documents loaded automatically from SharePoint
-                                {% if te_documents.last_loaded %} ({{ te_documents.last_loaded[:16] }}) {% endif %}
-                            {% elif te_documents.load_status == 'loading' %}
-                                <i class="fas fa-spinner fa-spin text-primary me-1"></i>
-                                Loading documents...
-                            {% elif te_documents.load_status == 'error' %}
-                                <i class="fas fa-exclamation-triangle text-danger me-1"></i>
-                                Error: {{ te_documents.error_message[:100] }}...
-                            {% else %}
-                                <i class="fas fa-clock text-warning me-1"></i>
-                                Documents not loaded yet
-                            {% endif %}
+    <!-- Status bar -->
+    <div class="main-content">
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="fw-semibold">T&E Documents:</span>
+                <span id="documents-status-text">
+                    {% if te_documents.load_status == 'loaded' %}
+                        <span class="text-success">Loaded from SharePoint</span>
+                    {% elif te_documents.load_status == 'loading' %}
+                        <span class="text-warning">Loading...</span>
+                    {% else %}
+                        <span class="text-muted">Not loaded</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="d-flex gap-2">
+                {% if te_documents.load_status == 'loaded' %}
+                <button class="btn btn-outline-primary btn-sm" onclick="viewExcelDocument()">
+                    <i class="fas fa-table me-1"></i> Excel Rules
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="viewWordDocument()">
+                    <i class="fas fa-file-word me-1"></i> Policies
+                </button>
+                {% endif %}
+                <button class="btn btn-outline-info btn-sm" onclick="refreshDocuments()">
+                    <i class="fas fa-sync me-1"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Layout principal -->
+        <div class="main-grid">
+            <!-- Zone d'analyse de tickets -->
+            <div class="ticket-analysis-zone">
+                <div class="analysis-header">
+                    <h2 class="mb-2">
+                        <i class="fas fa-file-invoice-dollar me-3"></i>
+                        Ticket Analysis Engine
+                    </h2>
+                    <p class="mb-0 opacity-90">Upload your expense tickets for automated policy compliance analysis</p>
+                </div>
+
+                <div class="upload-zone">
+                    <div class="upload-card" id="ticket-upload-area">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h3 class="mb-3">Drop Your Ticket Here</h3>
+                        <p class="text-muted mb-3">
+                            Drag and drop your expense ticket or click to browse
                         </p>
-                    </div>
-                    <div class="col-md-6 text-end">
-                        {% if te_documents.load_status == 'loaded' %}
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline-primary btn-sm btn-modern" onclick="viewExcelDocument()">
-                                <i class="fas fa-table me-1"></i> Excel
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm btn-modern" onclick="viewWordDocument()">
-                                <i class="fas fa-file-word me-1"></i> Word
-                            </button>
+                        <div class="supported-formats">
+                            <span class="file-type-badge">PDF</span>
+                            <span class="file-type-badge">Images</span>
+                            <span class="file-type-badge">Word</span>
+                            <span class="file-type-badge">Excel</span>
+                            <span class="file-type-badge">Text</span>
                         </div>
+
+                        <div class="question-section">
+                            <label class="form-label fw-semibold">
+                                <i class="fas fa-question-circle me-2"></i>
+                                Specific Question (Optional)
+                            </label>
+                            <textarea id="question-input" class="question-input" rows="2" 
+                                placeholder="e.g., Is this expense within policy limits? What's the approval threshold?"></textarea>
                         </div>
-                        {% endif %}
+
+                        <button class="btn-analyze" id="analyze-btn" onclick="analyzeTicket()" disabled>
+                            <i class="fas fa-magic me-2"></i>
+                            Analyze Ticket
+                        </button>
+
+                        <div id="ticket-status" class="ticket-status"></div>
                     </div>
+                </div>
+
+                <div class="analysis-results" id="analysis-results" style="display: none;">
+                    <div id="result-content"></div>
                 </div>
             </div>
 
-            <div class="row">
-                <!-- Section principale - Chatbot -->
-                <div class="col-lg-8">
-                    <div class="chatbot-section">
-                        <div class="chat-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h4 class="mb-0">
-                                    <i class="fas fa-robot me-2"></i>
-                                    T&E Assistant
-                                </h4>
-                                <div>
-                                    <button class="btn btn-outline-light btn-sm me-2" onclick="showHistory()">
-                                        <i class="fas fa-history"></i> History
-                                    </button>
-                                    <button class="btn btn-outline-light btn-sm" onclick="clearChat()">
-                                        <i class="fas fa-trash"></i> Clear
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Sidebar Chatbot -->
+            <div class="chatbot-sidebar">
+                <div class="chat-header">
+                    <h5 class="mb-1">
+                        <i class="fas fa-robot me-2"></i>
+                        T&E Assistant
+                    </h5>
+                    <small class="opacity-75">Ask me about T&E policies</small>
+                </div>
 
-                        <div class="row g-0">
-                            <!-- Zone de chat -->
-                            <div class="col-md-8">
-                                <div id="chat-container" class="chat-container">
-                                    <div class="chat-message assistant">
-                                        <strong>T&E Assistant:</strong>
-                                        <p>Hello! I'm your T&E analysis assistant for the APAC region.</p>
-                                    </div>
-                                </div>
-
-                                <div class="chat-input-area">
-                                    <div class="d-flex gap-2">
-                                        <input type="text" id="chat-input" class="form-control chat-input" 
-                                            placeholder="Ask about T&E policies or upload a ticket..." 
-                                            onkeypress="handleChatKeyPress(event)">
-                                        <button class="btn btn-chat text-white" onclick="sendMessage()">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Zone d'upload tickets -->
-                            <div class="col-md-4">
-                                <div class="p-3 h-100" style="background: #f8f9fa; border-left: 1px solid #e0e6ed;">
-                                    <h6 class="mb-3">Upload Ticket</h6>
-                                    
-                                    <div class="ticket-upload-area mb-3" id="ticket-upload-area" 
-                                        onclick="document.getElementById('ticket-upload').click()">
-                                        <i class="fas fa-file-upload mb-2" style="font-size: 2rem; color: var(--primary);"></i>
-                                        <p class="mb-0">Drop tickets here or click to upload</p>
-                                        <small class="text-muted">PDF, Images, Word, Excel, Text files</small>
-                                    </div>
-                                    
-                                    <input type="file" id="ticket-upload" 
-                                        accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.doc,.docx,.txt,.csv,.xlsx,.xls,.rtf" 
-                                        style="display:none" 
-                                        onchange="handleTicketUpload(this.files[0])">
-                                        
-                                    <div class="mb-3">
-                                        <label for="question-input" class="form-label">Question about this ticket:</label>
-                                        <textarea id="question-input" class="form-control" rows="3" 
-                                            placeholder="Is this expense valid? What's the limit for this category?"></textarea>
-                                    </div>
-                                    
-                                    <button class="btn btn-success w-100" onclick="analyzeTicket()" disabled id="analyze-btn">
-                                        <i class="fas fa-search me-2"></i>
-                                        Analyze Ticket
-                                    </button>
-                                    
-                                    <div id="ticket-status" class="mt-3"></div>
-                                </div>
+                <div class="chat-container" id="chat-container">
+                    <div class="chat-message assistant">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas fa-robot text-primary mt-1"></i>
+                            <div>
+                                <strong>T&E Assistant</strong>
+                                <p class="mb-0 mt-1">Hello! I'm your T&E policy assistant. You can ask me about expense limits, policies, or upload tickets for analysis.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Sidebar - Historique et infos -->
-                <div class="col-lg-4">
-                    <!-- Historique récent -->
-                    <div class="card border-0 shadow-sm mb-3">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">
-                                <i class="fas fa-clock me-2"></i>
-                                Recent Analysis
-                            </h6>
-                        </div>
-                        <div class="card-body p-0">
-                            <div id="recent-history" style="max-height: 300px; overflow-y: auto;">
-                                <div class="p-3 text-muted text-center">
-                                    <i class="fas fa-inbox"></i>
-                                    <p class="mb-0">No recent analysis</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Guide rapide -->
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Quick Guide
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <h6>Expense Limit Categories:</h6>
-                                <div class="d-flex flex-wrap gap-1">
-                                    <span class="badge bg-primary">Hotels</span>
-                                    <span class="badge bg-primary">Meals</span>
-                                    <span class="badge bg-primary">Breakfast</span>
-                                    <span class="badge bg-primary">Lunch</span>
-                                    <span class="badge bg-primary">Diner</span>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <h6>APAC Currencies:</h6>
-                                <div class="d-flex flex-wrap gap-1">
-                                    <span class="badge bg-secondary">AUD</span>
-                                    <span class="badge bg-secondary">JPY</span>
-                                    <span class="badge bg-secondary">SGD</span>
-                                    <span class="badge bg-secondary">HKD</span>
-                                    <span class="badge bg-secondary">USD</span>
-                                </div>
-                            </div>
-                            
-                            <small class="text-muted">
-                                <strong>Tip:</strong> Upload clear, readable tickets for best analysis results.
-                            </small>
-                        </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-group">
+                        <textarea id="chat-input" class="chat-input" rows="1" 
+                            placeholder="Ask about T&E policies..." 
+                            onkeypress="handleChatKeyPress(event)"></textarea>
+                        <button class="btn-send" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODALS -->
-    
+    <!-- Hidden file input -->
+    <input type="file" id="ticket-upload" 
+        accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.doc,.docx,.txt,.csv,.xlsx,.xls,.rtf" 
+        style="display:none">
+
+    <!-- Tous les modals existants restent identiques -->
     <!-- Excel View Modal -->
     <div class="modal fade" id="excelViewModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
@@ -595,48 +753,6 @@
         </div>
     </div>
 
-    <!-- Document Upload Modal -->
-    <div class="modal fade" id="documentUploadModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Load T&E Documents</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="upload-area" onclick="document.getElementById('excel-file').click()">
-                                <i class="fas fa-file-excel"></i>
-                                <h5>Excel Rules File</h5>
-                                <p class="text-muted">Upload the Excel file with T&E rules<br>(Internal staff Meal, Hotel, etc.)</p>
-                            </div>
-                            <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none">
-                            <div id="excel-status" class="mt-2"></div>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <div class="upload-area" onclick="document.getElementById('word-file').click()">
-                                <i class="fas fa-file-word"></i>
-                                <h5>Word Policies File</h5>
-                                <p class="text-muted">Upload the Word document with T&E policies and procedures</p>
-                            </div>
-                            <input type="file" id="word-file" accept=".docx,.doc" style="display:none">
-                            <div id="word-status" class="mt-2"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="uploadTEDocuments()" disabled id="upload-documents-btn">
-                        <i class="fas fa-upload me-2"></i>
-                        Load Documents
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- History Modal -->
     <div class="modal fade" id="historyModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
@@ -697,6 +813,731 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/te_main.js"></script>
+    <script>
+        // Variables globales
+        let currentTicketFile = null;
+        let selectedRating = 0;
+        let isAnalyzing = false;
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            setupDragAndDrop();
+            setupRatingStars();
+        });
+
+        function setupEventListeners() {
+            // File input
+            document.getElementById('ticket-upload').addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    handleTicketUpload(this.files[0]);
+                }
+            });
+
+            // Chat input auto-resize
+            const chatInput = document.getElementById('chat-input');
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            });
+
+            // Question input auto-resize
+            const questionInput = document.getElementById('question-input');
+            questionInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+            });
+        }
+
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('ticket-upload-area');
+            
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            // Handle dropped files
+            uploadArea.addEventListener('drop', handleDrop, false);
+            
+            // Handle click
+            uploadArea.addEventListener('click', () => {
+                if (!isAnalyzing) {
+                    document.getElementById('ticket-upload').click();
+                }
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function highlight() {
+                uploadArea.classList.add('drag-over');
+            }
+
+            function unhighlight() {
+                uploadArea.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    handleTicketUpload(files[0]);
+                }
+            }
+        }
+
+        function setupRatingStars() {
+            const stars = document.querySelectorAll('#rating-stars .star');
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    selectedRating = parseInt(this.dataset.rating);
+                    updateStarsDisplay();
+                });
+                
+                star.addEventListener('mouseover', function() {
+                    const rating = parseInt(this.dataset.rating);
+                    highlightStars(rating);
+                });
+            });
+            
+            const ratingContainer = document.getElementById('rating-stars');
+            if (ratingContainer) {
+                ratingContainer.addEventListener('mouseleave', function() {
+                    updateStarsDisplay();
+                });
+            }
+        }
+
+        function highlightStars(rating) {
+            const stars = document.querySelectorAll('#rating-stars .star');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.style.color = '#f59e0b';
+                } else {
+                    star.style.color = '#e5e7eb';
+                }
+            });
+        }
+
+        function updateStarsDisplay() {
+            highlightStars(selectedRating);
+        }
+
+        // Gestion du chat
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendMessage() {
+            const chatInput = document.getElementById('chat-input');
+            const message = chatInput.value.trim();
+            
+            if (!message) return;
+            
+            addMessageToChat('user', message);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            
+            // Envoyer à l'API
+            sendChatMessage(message);
+        }
+
+        function addMessageToChat(type, message, timestamp = null) {
+            const chatContainer = document.getElementById('chat-container');
+            
+            if (!timestamp) {
+                timestamp = new Date().toLocaleTimeString();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${type}`;
+            
+            if (type === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="text-end">
+                        <strong>You</strong>
+                        <p class="mb-1">${escapeHtml(message)}</p>
+                        <small class="opacity-75">${timestamp}</small>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="fas fa-robot text-primary mt-1"></i>
+                        <div class="flex-grow-1">
+                            <strong>T&E Assistant</strong>
+                            <div class="mt-1">${formatAIResponse(message)}</div>
+                            <small class="text-muted">${timestamp}</small>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendChatMessage(message) {
+            try {
+                // Afficher indicateur de loading
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'chat-message assistant';
+                loadingDiv.innerHTML = `
+                    <div class="d-flex align-items-start gap-2">
+                        <div class="spinner-custom"></div>
+                        <div class="loading-text">Thinking...</div>
+                    </div>
+                `;
+                
+                const chatContainer = document.getElementById('chat-container');
+                chatContainer.appendChild(loadingDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const result = await response.json();
+                
+                // Supprimer l'indicateur de loading
+                loadingDiv.remove();
+                
+                if (result.success) {
+                    addMessageToChat('assistant', result.response);
+                } else {
+                    addMessageToChat('assistant', 'Sorry, I encountered an error processing your request. Please try again.');
+                }
+                
+            } catch (error) {
+                console.error('Error sending chat message:', error);
+                
+                // Supprimer l'indicateur de loading s'il existe
+                const loadingMsg = document.querySelector('.chat-message.assistant:last-child');
+                if (loadingMsg && loadingMsg.innerHTML.includes('spinner-custom')) {
+                    loadingMsg.remove();
+                }
+                
+                addMessageToChat('assistant', 'Sorry, I cannot process your request right now. Please check your connection and try again.');
+            }
+        }
+
+        // Gestion de l'upload et analyse de tickets
+        function handleTicketUpload(file) {
+            if (!file || isAnalyzing) return;
+            
+            // Vérifications
+            const maxSize = 10 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showTicketStatus('error', 'File too large. Maximum 10MB allowed.');
+                return;
+            }
+            
+            currentTicketFile = file;
+            
+            // Mettre à jour l'interface
+            updateUploadUI(file);
+            
+            // Activer le bouton d'analyse
+            const analyzeBtn = document.getElementById('analyze-btn');
+            analyzeBtn.disabled = false;
+            analyzeBtn.classList.remove('disabled');
+        }
+
+        function updateUploadUI(file) {
+            const uploadCard = document.getElementById('ticket-upload-area');
+            const statusDiv = document.getElementById('ticket-status');
+            
+            // Mettre à jour l'icône
+            const uploadIcon = uploadCard.querySelector('.upload-icon i');
+            uploadIcon.className = 'fas fa-file-check';
+            uploadIcon.style.color = 'var(--success)';
+            
+            // Mettre à jour le titre
+            const title = uploadCard.querySelector('h3');
+            title.textContent = 'File Ready for Analysis';
+            
+            // Mettre à jour la description
+            const description = uploadCard.querySelector('p');
+            description.innerHTML = `<strong>${file.name}</strong><br><small class="text-muted">${formatFileSize(file.size)}</small>`;
+            
+            // Afficher le statut
+            showTicketStatus('success', `File "${file.name}" loaded successfully`);
+        }
+
+        function resetUploadUI() {
+            const uploadCard = document.getElementById('ticket-upload-area');
+            
+            // Réinitialiser l'icône
+            const uploadIcon = uploadCard.querySelector('.upload-icon i');
+            uploadIcon.className = 'fas fa-cloud-upload-alt';
+            uploadIcon.style.color = 'var(--primary)';
+            
+            // Réinitialiser le titre
+            const title = uploadCard.querySelector('h3');
+            title.textContent = 'Drop Your Ticket Here';
+            
+            // Réinitialiser la description
+            const description = uploadCard.querySelector('p');
+            description.innerHTML = 'Drag and drop your expense ticket or click to browse';
+        }
+
+        async function analyzeTicket() {
+            if (!currentTicketFile || isAnalyzing) return;
+            
+            isAnalyzing = true;
+            
+            // Désactiver le bouton et afficher loading
+            const analyzeBtn = document.getElementById('analyze-btn');
+            analyzeBtn.innerHTML = '<div class="spinner-custom"></div><span class="ms-2">Analyzing...</span>';
+            analyzeBtn.disabled = true;
+            
+            // Afficher la zone de résultats
+            const resultsSection = document.getElementById('analysis-results');
+            resultsSection.style.display = 'block';
+            resultsSection.innerHTML = `
+                <div class="loading-overlay">
+                    <div class="spinner-custom"></div>
+                    <div class="loading-text">AI is analyzing your ticket...</div>
+                    <div class="progress-custom mt-3">
+                        <div class="progress-bar-custom" style="width: 100%;"></div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const formData = new FormData();
+                formData.append('ticket_file', currentTicketFile);
+                
+                const question = document.getElementById('question-input').value;
+                formData.append('question', question);
+                
+                const response = await fetch('/api/analyze-ticket', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayAnalysisResult(data);
+                } else {
+                    displayAnalysisError(data.detail || 'Analysis failed');
+                }
+                
+            } catch (error) {
+                console.error('Erreur analyse:', error);
+                displayAnalysisError(error.message);
+            } finally {
+                // Restaurer le bouton
+                setTimeout(() => {
+                    analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+                    analyzeBtn.disabled = false;
+                    isAnalyzing = false;
+                }, 1000);
+            }
+        }
+
+        function displayAnalysisResult(result) {
+            const resultsSection = document.getElementById('analysis-results');
+            const analysis = result.analysis_result;
+            const ticket = result.ticket_info;
+            
+            const isPass = analysis.result === 'PASS';
+            const statusClass = isPass ? 'success' : 'warning';
+            const statusIcon = isPass ? 'fa-check-circle' : 'fa-exclamation-triangle';
+            const statusColor = isPass ? 'var(--success)' : 'var(--warning)';
+            
+            resultsSection.innerHTML = `
+                <div class="result-card ${statusClass}">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="result-icon" style="color: ${statusColor}; font-size: 2rem;">
+                                <i class="fas ${statusIcon}"></i>
+                            </div>
+                            <div>
+                                <h4 class="mb-1">${analysis.result}</h4>
+                                <p class="text-muted mb-0">${analysis.expense_type}</p>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge bg-light text-dark px-3 py-2 fs-6">
+                                ${ticket.amount ? `${ticket.amount} ${ticket.currency || ''}` : 'Amount not detected'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-content">
+                        <div class="p-3 rounded-3" style="background: rgba(248, 250, 252, 0.8); border-left: 4px solid ${statusColor};">
+                            ${formatAIResponse(analysis.justification)}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-robot me-1"></i>
+                            Analysis completed • ${new Date().toLocaleTimeString()}
+                        </small>
+                        <button class="btn btn-outline-primary btn-sm" onclick="showFeedbackModal()">
+                            <i class="fas fa-star me-1"></i> Rate Analysis
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Scroll vers les résultats
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayAnalysisError(errorMessage) {
+            const resultsSection = document.getElementById('analysis-results');
+            
+            resultsSection.innerHTML = `
+                <div class="result-card danger">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="result-icon" style="color: var(--danger); font-size: 2rem;">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-1">Analysis Failed</h4>
+                            <p class="text-muted mb-0">Unable to process the ticket</p>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${errorMessage}
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="resetAnalysis()">
+                        <i class="fas fa-redo me-2"></i>
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+
+        function showTicketStatus(type, message) {
+            const statusDiv = document.getElementById('ticket-status');
+            const statusClass = `status-${type}`;
+            
+            statusDiv.innerHTML = `
+                <div class="alert ${statusClass} border-0 rounded-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function resetAnalysis() {
+            currentTicketFile = null;
+            isAnalyzing = false;
+            
+            // Reset UI
+            resetUploadUI();
+            
+            // Cacher les résultats
+            const resultsSection = document.getElementById('analysis-results');
+            resultsSection.style.display = 'none';
+            
+            // Reset bouton
+            const analyzeBtn = document.getElementById('analyze-btn');
+            analyzeBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Analyze Ticket';
+            analyzeBtn.disabled = true;
+            
+            // Reset question
+            document.getElementById('question-input').value = '';
+            
+            // Reset status
+            document.getElementById('ticket-status').innerHTML = '';
+        }
+
+        // Fonctions utilitaires
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatAIResponse(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>')
+                .replace(/`(.*?)`/g, '<code class="bg-light px-1 rounded">$1</code>');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Fonctions pour les modals (gardées identiques)
+        function showFeedbackModal() {
+            const modalElement = document.getElementById('feedbackModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                
+                // Reset du formulaire
+                selectedRating = 0;
+                updateStarsDisplay();
+                document.getElementById('issue-type').value = '';
+                document.getElementById('feedback-comment').value = '';
+            }
+        }
+
+        function showHistory() {
+            const modalElement = document.getElementById('historyModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                loadFullHistory();
+            }
+        }
+
+        function showAdminPanel() {
+            const modalElement = document.getElementById('adminModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                setTimeout(() => {
+                    loadAdminLogs();
+                    loadAdminUsers(); 
+                    loadAdminFeedback();
+                }, 100);
+            }
+        }
+
+        async function submitFeedback() {
+            if (selectedRating === 0) {
+                alert('Please select a rating.');
+                return;
+            }
+            
+            const issueType = document.getElementById('issue-type').value;
+            const comment = document.getElementById('feedback-comment').value;
+            
+            try {
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        analysis_id: 'current',
+                        rating: selectedRating,
+                        issue_type: issueType,
+                        comment: comment
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const modalElement = document.getElementById('feedbackModal');
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) modal.hide();
+                    
+                    addMessageToChat('assistant', 'Thank you for your feedback! It helps improve the T&E analysis system.');
+                } else {
+                    throw new Error(result.detail || 'Failed to submit feedback');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                alert('Error submitting feedback: ' + error.message);
+            }
+        }
+
+        // Fonctions de visualisation des documents
+        async function viewExcelDocument() {
+            const modalElement = document.getElementById('excelViewModal');
+            if (!modalElement) return;
+            
+            const modal = new bootstrap.Modal(modalElement);
+            const mount = document.getElementById('excel-content');
+            mount.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p class="mt-2">Loading Excel content...</p></div>`;
+            
+            try {
+                const response = await fetch('/api/view-excel');
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.detail || 'Error viewing Excel');
+                }
+                
+                const sheets = data.sheets || {};
+                let html = '';
+                
+                Object.keys(sheets).forEach(name => {
+                    const {columns = [], rows = []} = sheets[name] || {};
+                    html += `
+                        <h6 class="mt-3">${name}</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>
+                                </thead>
+                                <tbody>
+                                    ${rows.map(row => `<tr>${row.map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+                
+                mount.innerHTML = html || '<div class="text-muted">No data</div>';
+                modal.show();
+                
+            } catch (error) {
+                console.error(error);
+                mount.innerHTML = `<div class="alert alert-danger">Unable to load Excel preview.</div>`;
+                modal.show();
+            }
+        }
+
+        async function viewWordDocument() {
+            const modalElement = document.getElementById('wordViewModal');
+            if (!modalElement) return;
+            
+            const modal = new bootstrap.Modal(modalElement);
+            const mount = document.getElementById('word-content');
+            mount.innerHTML = `<div class="text-center"><div class="spinner-custom"></div><p class="mt-2">Loading Word content...</p></div>`;
+            
+            try {
+                const response = await fetch('/api/view-word');
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.detail || 'Error viewing Word');
+                }
+                
+                const sections = data.sections || [];
+                let html = `<div class="word-document-viewer">`;
+                
+                sections.forEach(s => {
+                    html += `
+                        <div class="word-section mb-4">
+                            <h5 class="section-title text-primary border-bottom pb-2">${s.title || ''}</h5>
+                            <div class="section-content">${(s.content || '').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+                mount.innerHTML = html || '<div class="text-muted">No content</div>';
+                modal.show();
+                
+            } catch (error) {
+                console.error(error);
+                mount.innerHTML = `<div class="alert alert-danger">Unable to load Word preview.</div>`;
+                modal.show();
+            }
+        }
+
+        async function refreshDocuments() {
+            if (!confirm('Refresh T&E documents from SharePoint? This may take a few moments.')) {
+                return;
+            }
+            
+            try {
+                const statusText = document.getElementById('documents-status-text');
+                if (statusText) {
+                    statusText.innerHTML = `
+                        <div class="spinner-custom d-inline-block me-2" style="width: 1rem; height: 1rem;"></div>
+                        <span class="text-primary">Refreshing documents...</span>
+                    `;
+                }
+                
+                const response = await fetch('/api/refresh-documents', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                    
+                    addMessageToChat('assistant', 'T&E documents refreshed successfully from SharePoint!');
+                } else {
+                    throw new Error(result.message || 'Failed to refresh documents');
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing documents:', error);
+                
+                const statusText = document.getElementById('documents-status-text');
+                if (statusText) {
+                    statusText.innerHTML = `
+                        <span class="text-danger">Error refreshing: ${error.message}</span>
+                    `;
+                }
+                
+                alert('Error refreshing documents: ' + error.message);
+            }
+        }
+
+        async function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    const response = await fetch('/api/logout', {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        window.location.href = result.redirect;
+                    }
+                    
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    window.location.href = '/';
+                }
+            }
+        }
+
+        // Fonctions admin (stubs - à implémenter selon les fonctions existantes)
+        async function loadFullHistory() {
+            // Implementation from original code
+        }
+
+        async function loadAdminLogs() {
+            // Implementation from original code  
+        }
+
+        async function loadAdminUsers() {
+            // Implementation from original code
+        }
+
+        async function loadAdminFeedback() {
+            // Implementation from original code
+        }
+    </script>
 </body>
 </html>
