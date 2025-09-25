@@ -44,8 +44,6 @@ import cv2
 import numpy as np
 from PIL import ImageEnhance, ImageFilter
 
-
-ocr_engine = PaddleOCR(lang='fr', use_angle_cls=True, show_log=False)
 # Initialiser le système RAG
 rag_system = TERAGSystem()
 
