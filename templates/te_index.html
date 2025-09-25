@@ -1512,6 +1512,7 @@
                 <div class="analysis-content-area">
                     <!-- Section Upload -->
                     <div class="upload-section">
+                        <!-- Zone d'upload cliquable -->
                         <div class="upload-zone-modern" id="ticket-upload-area">
                             <div class="upload-visual">
                                 <div class="upload-icon-container">
@@ -1527,19 +1528,20 @@
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="question-panel">
-                                <div class="question-header">
-                                    <i class="fas fa-comment-dots me-2"></i>
-                                    <span>Specific Question</span>
-                                    <small class="text-muted">(Optional)</small>
-                                </div>
-                                <textarea id="question-input" class="question-field" rows="2" 
-                                    placeholder="e.g., Is this expense within policy limits?"></textarea>
-                            </div>
-                            
-                            <div id="ticket-status" class="ticket-status"></div>
                         </div>
+
+                        <!-- Zone de question séparée -->
+                        <div class="question-panel">
+                            <div class="question-header">
+                                <i class="fas fa-comment-dots me-2"></i>
+                                <span>Specific Question</span>
+                                <small class="text-muted">(Optional)</small>
+                            </div>
+                            <textarea id="question-input" class="question-field" rows="2" 
+                                placeholder="e.g., Is this expense within policy limits?"></textarea>
+                        </div>
+
+                        <div id="ticket-status" class="ticket-status"></div>
                         <!-- BOUTONS D'ACTION -->
                         <div class="action-buttons-row">
                             <button class="btn-action-modern" id="preview-btn" onclick="previewTicket()" disabled>
