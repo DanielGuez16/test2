@@ -698,11 +698,13 @@ function updateUploadUI(file) {
     if (!uploadCard) return;
     
     // Mettre à jour l'icône
-    const uploadIcon = uploadCard.querySelector('.upload-icon i');
+    const uploadIcon = uploadCard.querySelector('.upload-icon-main');
     if (uploadIcon) {
-        uploadIcon.className = 'fas fa-file-check';
+        uploadIcon.className = 'fas fa-check upload-icon-main';
         uploadIcon.style.color = 'var(--success)';
+        uploadIcon.style.animation = 'pulse 1.5s infinite';
     }
+
     
     // Mettre à jour le titre - chercher h4 au lieu de h3
     const title = uploadCard.querySelector('h4');
