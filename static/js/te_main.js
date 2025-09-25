@@ -2104,10 +2104,23 @@ function setupDragAndDrop() {
 
     // Handle dropped files
     ticketUploadArea.addEventListener('drop', handleDrop, false);
-    
+
     // Handle click to browse files
     ticketUploadArea.addEventListener('click', function(e) {
-        if (!isAnalyzing && !e.target.closest('textarea') && !e.target.closest('button')) {
+        // Ne pas ouvrir le file picker si on clique sur des éléments interactifs
+        if (isAnalyzing) return;
+        
+        const clickedElement = e.target;
+        const isInteractiveElement = 
+            clickedElement.tagName === 'TEXTAREA' ||
+            clickedElement.tagName === 'BUTTON' ||
+            clickedElement.tagName === 'INPUT' ||
+            clickedElement.closest('textarea') ||
+            clickedElement.closest('button') ||
+            clickedElement.closest('.question-panel') ||
+            clickedElement.closest('.action-buttons-row');
+        
+        if (!isInteractiveElement) {
             document.getElementById('ticket-upload').click();
         }
     });
