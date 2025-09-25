@@ -1861,37 +1861,44 @@ async function loadWordContent() {
         const result = await response.json();
         
         if (result.success) {
-            let html = `
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center">
+            if (result.preview_type === 'iframe') {
+                // Affichage iframe avec prévisualisation Office
+                contentDiv.innerHTML = `
+                    <div class="mb-3">
                         <h6><i class="fas fa-file-word text-primary me-2"></i>${result.filename}</h6>
-                        <div>
-                            <span class="badge bg-primary">${result.total_sections} Sections</span>
-                        </div>
+                        <small class="text-muted">Office Online Preview • Last loaded: ${formatDateTime(result.last_loaded)}</small>
                     </div>
-                    <small class="text-muted">Last loaded: ${formatDateTime(result.last_loaded)}</small>
-                </div>
-            `;
-            
-            // Style PDF-like pour le contenu Word
-            html += '<div class="word-document-viewer">';
-            
-            result.sections.forEach((section, index) => {
-                html += `
-                    <div class="word-section mb-4">
-                        <h5 class="section-title text-primary border-bottom pb-2">
-                            ${escapeHtml(section.title)}
-                        </h5>
-                        <div class="section-content">
-                            ${formatWordContent(section.content)}
-                        </div>
+                    <div class="office-preview-container" style="height: 600px; border: 1px solid #ddd; border-radius: 8px;">
+                        <iframe 
+                            src="${result.embed_url}" 
+                            style="width: 100%; height: 100%; border: none;"
+                            sandbox="allow-scripts allow-same-origin"
+                            title="Word Document Preview">
+                        </iframe>
                     </div>
                 `;
-            });
-            
-            html += '</div>';
-            contentDiv.innerHTML = html;
-            
+            } else {
+                // Fallback vers affichage texte
+                let html = `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-file-word text-primary me-2"></i>${result.filename}</h6>
+                        <small class="text-muted">Text Preview • Last loaded: ${formatDateTime(result.last_loaded)}</small>
+                    </div>
+                    <div class="word-document-viewer">
+                `;
+                
+                result.sections.forEach(section => {
+                    html += `
+                        <div class="word-section mb-4">
+                            <h5 class="section-title text-primary border-bottom pb-2">${escapeHtml(section.title)}</h5>
+                            <div class="section-content">${formatWordContent(section.content)}</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                contentDiv.innerHTML = html;
+            }
         } else {
             throw new Error(result.detail || 'Failed to load Word content');
         }

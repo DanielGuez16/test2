@@ -497,6 +497,52 @@ class SharePointClient:
             
         except Exception as e:
             raise Exception(f"Erreur lecture fichier DOCX: {str(e)}")
+        
+    def get_file_preview_html(self, path: str) -> dict:
+        """Obtient une prévisualisation HTML d'un fichier Office depuis SharePoint
+        
+        Args:
+            path (str): Chemin vers le fichier dans SharePoint
+            
+        Returns:
+            dict: Contient 'html' avec le rendu HTML ou 'error'
+        """
+        try:
+            self.access_token = self.check_token_validity()
+            
+            # Étape 1: Obtenir les métadonnées du fichier pour récupérer l'ID
+            url = f"https://graph.microsoft.com/v1.0/sites/{self.site_id}/drive/root:/{path}"
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            
+            response = self.session.get(url, headers=headers)
+            response.raise_for_status()
+            file_data = response.json()
+            file_id = file_data.get('id')
+            
+            if not file_id:
+                return {'error': 'File ID not found'}
+            
+            # Étape 2: Demander la prévisualisation
+            preview_url = f"https://graph.microsoft.com/v1.0/sites/{self.site_id}/drive/items/{file_id}/preview"
+            
+            response = self.session.post(preview_url, headers=headers, json={
+                "viewer": "onedrive",  # ou "office" pour une vue plus riche
+                "chromeless": True,    # Sans interface OneDrive
+                "allowEdit": False     # Lecture seule
+            })
+            
+            if response.status_code == 200:
+                preview_data = response.json()
+                return {
+                    'html': preview_data.get('getUrl', ''),  # URL iframe
+                    'embed_url': preview_data.get('postUrl', ''),
+                    'success': True
+                }
+            else:
+                return {'error': f'Preview API returned {response.status_code}'}
+                
+        except Exception as e:
+            return {'error': str(e)}
 
 
 if __name__ == "__main__":

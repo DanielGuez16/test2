@@ -396,48 +396,47 @@ async def view_excel_document(session_token: Optional[str] = Cookie(None)):
         logger.error(f"Erreur visualisation Excel: {e}")
         raise HTTPException(status_code=500, detail=f"Error viewing Excel: {str(e)}")
 
+
 @app.get("/api/view-word")  
 async def view_word_document(session_token: Optional[str] = Cookie(None)):
-    """Visualise le document Word chargé"""
+    """Visualise le document Word avec prévisualisation Graph API"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    if not te_documents["word_policies"]:
-        raise HTTPException(status_code=404, detail="No Word document loaded")
-    
     try:
-        # Diviser le texte en sections pour l'affichage
-        text = te_documents["word_policies"]
-        sections = []
+        sharepoint_client = SharePointClient()
+        word_path = "Chatbot/sources/APAC Travel Entertainment Procedure Mar2025_Clean.docx"
         
-        # Diviser par paragraphes
-        paragraphs = text.split('\n\n')
-        current_section = {"title": "T&E Policies", "content": ""}
+        # Essayer d'abord la prévisualisation HTML
+        preview_result = sharepoint_client.get_file_preview_html(word_path)
         
-        for para in paragraphs[:50]:  # Limiter à 50 paragraphes
-            if len(para.strip()) > 0:
-                if len(current_section["content"]) > 2000:  # Nouvelle section tous les 2000 chars
-                    sections.append(current_section)
-                    current_section = {"title": f"Section {len(sections) + 1}", "content": para}
-                else:
-                    current_section["content"] += "\n\n" + para
-        
-        if current_section["content"]:
-            sections.append(current_section)
-        
-        return {
-            "success": True,
-            "filename": "APAC Travel Entertainment Procedure.docx",
-            "sections": sections,
-            "total_sections": len(sections),
-            "last_loaded": te_documents["last_loaded"]
-        }
+        if preview_result.get('success'):
+            return {
+                "success": True,
+                "filename": "APAC Travel Entertainment Procedure.docx", 
+                "preview_type": "iframe",
+                "embed_url": preview_result['html'],
+                "last_loaded": te_documents["last_loaded"]
+            }
+        else:
+            # Fallback vers texte brut si prévisualisation échoue
+            word_binary = sharepoint_client.read_binary_file(word_path)
+            word_text = sharepoint_client.read_docx_file_as_text(word_binary)
+            
+            sections = [{"title": "T&E Policies", "content": word_text}]
+            
+            return {
+                "success": True,
+                "filename": "APAC Travel Entertainment Procedure.docx",
+                "preview_type": "text", 
+                "sections": sections,
+                "last_loaded": te_documents["last_loaded"]
+            }
         
     except Exception as e:
         logger.error(f"Erreur visualisation Word: {e}")
         raise HTTPException(status_code=500, detail=f"Error viewing Word: {str(e)}")
-    
 
 @app.post("/api/analyze-ticket")
 async def analyze_ticket(
