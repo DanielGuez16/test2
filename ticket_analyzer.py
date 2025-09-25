@@ -457,3 +457,84 @@ class TicketAnalyzer:
         context_parts.append("=== END OF COMPLETE T&E DATA ===")
         
         return "\n".join(context_parts)
+    
+    def ai_extract_ticket_info_enhanced(self, raw_text: str, filename: str, ocr_lines: List[Dict] = None) -> dict:
+        """Extraction améliorée avec données OCR structurées"""
+        try:
+            # Utiliser les lignes OCR pour l'analyse contextuelle
+            context_info = self._build_ocr_context(ocr_lines) if ocr_lines else ""
+            
+            extraction_prompt = f"""
+            Analyze this receipt/ticket and extract precise information in JSON format.
+            
+            OCR Context: {context_info}
+            
+            Raw text: {raw_text[:2000]}
+            
+            Extract to this JSON structure (use double quotes only):
+            {{
+                "amount": 57.0,
+                "currency": "EUR", 
+                "category": "meal",
+                "subcategory": "dinner",
+                "date": "2025-09-12",
+                "vendor": "pizzeria",
+                "location": "Rome", 
+                "country_code": "IT",
+                "confidence": 0.8,
+                "payment_method": "credit_card",
+                "vat_rate": 20.0,
+                "items": [
+                    {{"label": "Pizza", "qty": 1, "unit_price": 57.0}}
+                ]
+            }}
+
+            Return ONLY valid JSON, no additional text.
+            """
+            
+            # Obtenir contexte RAG pour améliorer l'extraction
+            context = "Extract structured information from receipt/ticket with high precision."
+            
+            ai_response = self.llm_connector.get_llm_response(extraction_prompt, context)
+            
+            try:
+                extracted_info = json.loads(ai_response)
+            except json.JSONDecodeError:
+                logger.warning("JSON malformé, utilisation du fallback")
+                extracted_info = self._parse_ai_response_enhanced(ai_response, ocr_lines)
+            
+            # Métadonnées
+            extracted_info.update({
+                "filename": filename,
+                "raw_text": raw_text[:1500],
+                "extraction_method": "paddleocr_enhanced",
+                "ocr_lines_count": len(ocr_lines) if ocr_lines else 0
+            })
+            
+            return extracted_info
+            
+        except Exception as e:
+            logger.error(f"Erreur extraction IA enhanced: {e}")
+            return self._fallback_extraction_enhanced(raw_text, filename, ocr_lines)
+
+    def _build_ocr_context(self, ocr_lines: List[Dict]) -> str:
+        """Construire contexte depuis lignes OCR"""
+        if not ocr_lines:
+            return ""
+        
+        # Grouper par zones (haut, milieu, bas)
+        height_max = max(line["bbox"][3] for line in ocr_lines)
+        
+        top_lines = [l for l in ocr_lines if l["bbox"][1] < height_max * 0.3]
+        middle_lines = [l for l in ocr_lines if height_max * 0.3 <= l["bbox"][1] <= height_max * 0.7]
+        bottom_lines = [l for l in ocr_lines if l["bbox"][1] > height_max * 0.7]
+        
+        context = []
+        if top_lines:
+            context.append(f"Header: {' | '.join([l['text'] for l in top_lines[:5]])}")
+        if middle_lines:
+            context.append(f"Content: {' | '.join([l['text'] for l in middle_lines[:10]])}")
+        if bottom_lines:
+            context.append(f"Footer: {' | '.join([l['text'] for l in bottom_lines[:5]])}")
+        
+        return " // ".join(context)

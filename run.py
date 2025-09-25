@@ -40,7 +40,14 @@ from context_builder import TEContextBuilder
 from ticket_analyzer import TicketAnalyzer
 # Import du système RAG
 from rag_system import TERAGSystem
+import cv2
+import numpy as np
+from paddleocr import PaddleOCR
+from PIL import ImageEnhance, ImageFilter
+import piexif
 
+
+ocr_engine = PaddleOCR(lang='fr', use_angle_cls=True, show_log=False)
 # Initialiser le système RAG
 rag_system = TERAGSystem()
 
@@ -844,28 +851,33 @@ def preprocess_image_for_ocr(image):
         logger.warning(f"Erreur preprocessing: {e}")
         return image
 
-
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
-    """Extrait SEULEMENT le texte brut du ticket - AUCUNE analyse"""
+    """Extraction avancée avec pipeline OCR robuste sans piexif"""
     try:
         file_ext = Path(filename).suffix.lower()
-        text = ""
         
         if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp']:
-            # Images - utiliser OCR avec preprocessing
-            try:
-                image = Image.open(io.BytesIO(file_content))
-                image = preprocess_image_for_ocr(image)
-                
-                import pytesseract
-                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-€$£¥₹/: '
-                text = pytesseract.image_to_string(image, config=custom_config)
-                
-                logger.info(f"OCR extrait {len(text)} caractères de {filename}")
-                
-            except Exception as e:
-                logger.warning(f"Erreur OCR image: {e}")
-                text = f"Image file {filename} - OCR extraction failed"
+            # Utiliser la nouvelle pipeline OCR
+            from advanced_ocr import AdvancedOCRProcessor
+            
+            processor = AdvancedOCRProcessor()
+            result = processor.process_ticket_image(file_content, filename)
+            
+            return {
+                "filename": filename,
+                "raw_text": result.get("raw_text", ""),
+                "file_type": file_ext,
+                "extraction_method": result.get("extraction_method", "paddleocr_advanced"),
+                "ocr_confidence": result.get("average_confidence", 0.0),
+                "ocr_lines": result.get("ocr_lines", []),
+                "lines_detected": result.get("lines_detected", 0),
+                # Données structurées extraites
+                "amount": result.get("total"),
+                "currency": result.get("currency", "EUR"),
+                "vendor": result.get("merchant"),
+                "date": result.get("date"),
+                "category": "unknown"  # À déterminer par l'IA
+            }
                 
         elif file_ext == '.pdf':
             # PDF - extraire le texte
@@ -980,9 +992,9 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
             "file_type": file_ext,
             "extraction_method": "text_only"
         }
-        
+
     except Exception as e:
-        logger.error(f"Erreur extraction texte: {e}")
+        logger.error(f"Erreur extraction: {e}")
         return {
             "filename": filename,
             "error": str(e),
