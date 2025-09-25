@@ -1391,12 +1391,35 @@
             font-weight: 500;
         }
 
+        .bg-primary {
+            background-color: var(--primary) !important;
+        }
+
+        .bg-secondary {
+            background-color: var(--secondary) !important;
+        }
+
+        .bg-info {
+            background-color: var(--secondary) !important;
+        }
+
+
         .bg-third {
             background-color: #D3A5E9 !important;
         }
 
         .text-violet {
             color: var(--primary) !important;
+        }
+
+        .badge-admin {
+            background: var(--primary) !important;
+            color: white;
+        }
+
+        .badge-user {
+            background: var(--secondary) !important;
+            color: white;
         }
     </style>
 </head>
@@ -2791,7 +2814,7 @@
                                             <h6 class="card-title">${user.full_name}</h6>
                                             <p class="card-text">
                                                 <small class="text-muted">${user.username}</small><br>
-                                                <span class="badge bg-${user.role === 'admin' ? 'danger' : 'primary'}">${user.role}</span>
+                                                <span class="badge badge-${user.role === 'admin' ? 'admin' : 'user'}">${user.role}</span>
                                             </p>
                                         </div>
                                     </div>
