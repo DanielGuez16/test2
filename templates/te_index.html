@@ -1779,7 +1779,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="fas fa-receipt me-2"></i>Extracted Ticket Information
+                        <i class="fas fa-receipt me-2"></i>Extracted Ticket Information (Fake Ticket)
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -2108,7 +2108,7 @@
             const filename = ticketInfo.filename || '—';
             const ccy = ticketInfo.currency || 'EUR';
             const vatRate = toFloat(ticketInfo.vat_rate) ?? 20; // défaut 20% si non fourni
-            const payMethod = ticketInfo.payment_method || 'CB / CREDIT CARD / CASH / etc.';
+            const payMethod = ticketInfo.payment_method || 'CB / CREDIT CARD / CASH';
             const category = ticketInfo.category || 'GENERAL';
             const ticketDate = ticketInfo.date || new Date().toISOString();
 
