@@ -1436,6 +1436,70 @@
             background: var(--secondary) !important;
             color: white;
         }
+
+        /* Styles pour la visualisation de documents Word améliorée */
+        .word-document-viewer {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 100%;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+
+        .word-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .section-content {
+            font-size: 0.95rem;
+            color: #2d3748;
+        }
+
+        .definition-item {
+            transition: all 0.2s ease;
+        }
+
+        .definition-item:hover {
+            background-color: #f8f9ff !important;
+            transform: translateX(5px);
+        }
+
+        /* Améliorer les listes */
+        .list-group-item {
+            transition: background-color 0.2s ease;
+        }
+
+        .list-group-item:hover {
+            background-color: rgba(118, 39, 155, 0.05);
+        }
+
+        /* Style pour les alertes */
+        .alert {
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive pour la visualisation */
+        @media (max-width: 768px) {
+            .word-document-viewer {
+                padding: 1rem;
+                font-size: 0.9rem;
+            }
+            
+            .section-title {
+                font-size: 1.25rem;
+            }
+        }
     </style>
 </head>
 <body>

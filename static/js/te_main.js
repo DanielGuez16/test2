@@ -1924,31 +1924,74 @@ async function loadWordContent() {
 
 
 function formatWordContent(content) {
-    // Formatage pour ressembler à un document PDF
+    if (!content) return '';
+    
     return content
         .split('\n\n')
         .map(paragraph => {
-            if (paragraph.trim()) {
-                // Détecter les listes
-                if (paragraph.includes('•') || paragraph.includes('-')) {
-                    const listItems = paragraph.split(/[•-]/).filter(item => item.trim());
-                    if (listItems.length > 1) {
-                        let listHtml = '<ul class="list-unstyled ms-3">';
-                        listItems.forEach(item => {
-                            if (item.trim()) {
-                                listHtml += `<li class="mb-1"><i class="fas fa-chevron-right text-primary me-2"></i>${escapeHtml(item.trim())}</li>`;
-                            }
-                        });
-                        listHtml += '</ul>';
-                        return listHtml;
-                    }
-                }
-                
-                // Paragraphe normal
-                return `<p class="mb-3 text-justify">${escapeHtml(paragraph.trim())}</p>`;
+            if (!paragraph.trim()) return '';
+            
+            const p = paragraph.trim();
+            
+            // Détecter les titres principaux (tout en majuscules ou mots-clés spécifiques)
+            if (p.match(/^[A-Z\s]{15,}$/) || p.match(/^(SECTION|ARTICLE|CHAPTER|PROCEDURE|POLICY|GUIDELINES)/i)) {
+                return `<h4 class="text-primary fw-bold mt-4 mb-3 border-bottom pb-2">${escapeHtml(p)}</h4>`;
             }
-            return '';
+            
+            // Détecter les sous-titres (premières lettres en majuscules)
+            if (p.match(/^[A-Z][a-z].*:$/) || p.match(/^\d+\.\s*[A-Z]/)) {
+                return `<h5 class="text-secondary fw-semibold mt-3 mb-2">${escapeHtml(p)}</h5>`;
+            }
+            
+            // Détecter les listes avec puces ou numéros
+            if (p.includes('•') || p.match(/^\s*[-*]\s/) || p.match(/^\s*\d+\.\s/)) {
+                const listItems = p.split(/[•\-*]|\d+\./).filter(item => item.trim());
+                if (listItems.length > 1) {
+                    let listHtml = '<ul class="list-group list-group-flush mb-3">';
+                    listItems.forEach(item => {
+                        if (item.trim()) {
+                            listHtml += `
+                                <li class="list-group-item border-0 ps-0 py-2">
+                                    <i class="fas fa-chevron-right text-primary me-2" style="font-size: 0.8rem;"></i>
+                                    <span>${escapeHtml(item.trim())}</span>
+                                </li>
+                            `;
+                        }
+                    });
+                    listHtml += '</ul>';
+                    return listHtml;
+                }
+            }
+            
+            // Détecter les définitions (contient ":" au milieu)
+            if (p.includes(':') && !p.endsWith(':') && p.split(':').length === 2) {
+                const [term, definition] = p.split(':');
+                return `
+                    <div class="definition-item mb-3 p-3 bg-light rounded-3 border-start border-4 border-primary">
+                        <strong class="text-primary">${escapeHtml(term.trim())}:</strong>
+                        <span class="ms-2">${escapeHtml(definition.trim())}</span>
+                    </div>
+                `;
+            }
+            
+            // Détecter les notes importantes (contient certains mots-clés)
+            if (p.match(/\b(important|note|attention|warning|caution|remember)\b/i)) {
+                return `
+                    <div class="alert alert-info border-0 mb-3" style="border-left: 4px solid var(--info) !important;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        ${escapeHtml(p)}
+                    </div>
+                `;
+            }
+            
+            // Paragraphe normal avec meilleur styling
+            return `
+                <p class="mb-3 lh-lg text-justify" style="text-align: justify; hyphens: auto;">
+                    ${escapeHtml(p)}
+                </p>
+            `;
         })
+        .filter(item => item) // Supprimer les éléments vides
         .join('');
 }
 
