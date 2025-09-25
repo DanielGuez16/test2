@@ -1446,11 +1446,11 @@
             </div>
             <div class="d-flex gap-2">
                 {% if te_documents.load_status == 'loaded' %}
-                <button class="btn btn-outline-primary btn-sm" onclick="viewExcelDocument()">
-                    <i class="fas fa-table me-1"></i> Excel Rules
+                <button class="btn btn-sm" style="border: 2px solid var(--secondary); color: var(--secondary);" onclick="viewExcelDocument()">
+                    <i class="fas fa-table me-1"></i> Consolidated Limits
                 </button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="viewWordDocument()">
-                    <i class="fas fa-file-word me-1"></i> Policies
+                <button class="btn btn-sm" style="border: 2px solid var(--secondary); color: var(--secondary);" onclick="viewWordDocument()">
+                    <i class="fas fa-file-word me-1"></i> T&E Procedures
                 </button>
                 {% endif %}
                 <button class="btn btn-outline-info btn-sm" onclick="refreshDocuments()">
@@ -1557,7 +1557,7 @@
                             placeholder="Ask about T&E policies..." 
                             onkeypress="handleChatKeyPress(event)"></textarea>
                         <button class="btn-send" onclick="sendMessage()">
-                            <i class="fas fa-paper-plane"></i>
+                            <i class="fas fa-paper-plane text-white"></i>
                         </button>
                     </div>
                 </div>
@@ -1932,7 +1932,7 @@
             } else {
                 messageDiv.innerHTML = `
                     <div class="d-flex align-items-start gap-2">
-                        <i class="fas fa-robot text-primary mt-1"></i>
+                        <i class="fas fa-robot text-violet mt-1"></i>
                         <div class="flex-grow-1">
                             <strong>T&E Assistant</strong>
                             <div class="mt-1">${formatAIResponse(message)}</div>
