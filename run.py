@@ -47,8 +47,18 @@ rag_system = TERAGSystem()
 # Imports internes
 from llm_connector import LLMConnector
 from te_document_processor import TEDocumentProcessor
-from user_management import authenticate_user, log_activity, get_logs, USERS_DB, authenticate_user, get_analysis_history, get_feedback_stats, save_feedback_to_sharepoint
-
+from user_management import (
+    authenticate_user, 
+    log_activity, 
+    get_logs, 
+    get_logs_stats,
+    USERS_DB, 
+    get_analysis_history, 
+    get_feedback_stats, 
+    save_feedback,
+    save_analysis_history,
+    clear_all_logs
+)
 from sharepoint_connector import SharePointClient
 from embedding_connector import EMBEDDINGConnector
 
@@ -489,9 +499,8 @@ async def analyze_ticket(
             "question": question
         }
         
-        # Sauvegarder dans SharePoint (nouvelle fonction séparée)
+        # Sauvegarder dans SharePoint 
         try:
-            from user_management import save_analysis_history
             save_analysis_history(
                 current_user["username"],
                 ticket_file.filename,
@@ -560,7 +569,6 @@ async def get_analysis_history_api(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        from user_management import get_analysis_history
         history = get_analysis_history(limit=50)
         
         # Filtrer par utilisateur si non admin
@@ -650,7 +658,6 @@ async def get_logs_statistics(session_token: Optional[str] = Cookie(None)):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    from user_management import get_logs_stats
     stats = get_logs_stats()
     
     return {
@@ -701,8 +708,8 @@ async def submit_feedback(
         analysis_id = data.get("analysis_id", "current")
         
         # Utiliser la fonction simplifiée
-        from user_management import save_feedback
         save_feedback(current_user["username"], rating, comment, issue_type, analysis_id)
+
         
         # Aussi logger dans les logs généraux
         log_activity(current_user["username"], "FEEDBACK", 
@@ -728,7 +735,6 @@ async def get_feedback_stats_api(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
-        from user_management import get_feedback_stats
         stats = get_feedback_stats()
         return {
             "success": True,
@@ -753,7 +759,6 @@ async def clear_all_logs_api(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
-        from user_management import clear_all_logs
         success = clear_all_logs()
         
         if success:

@@ -1297,20 +1297,6 @@ function showAdminPanel() {
     }
 }
 
-async function loadAdminLogs() {
-    try {
-        const response = await fetch('/api/logs?limit=50');
-        const result = await response.json();
-        
-        if (result.success) {
-            displayLogs(result.logs);
-        }
-    } catch (error) {
-        console.error('Error loading logs:', error);
-        document.getElementById('logs-container').innerHTML = '<div class="alert alert-danger">Error loading logs</div>';
-    }
-}
-
 function displayLogs(logs) {
     // Chercher le conteneur des logs ou créer une div après les stats
     let logsContainer = document.getElementById('logs-table-container');
