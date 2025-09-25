@@ -89,6 +89,7 @@ def log_activity(username: str, action: str, details: str = ""):
         try:
             binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
             logs_df = pd.read_excel(BytesIO(binary_content))
+            logs_df = logs_df.fillna("")
             
             # Vérifier les colonnes
             expected_columns = ["timestamp", "username", "action", "details"]
@@ -134,6 +135,7 @@ def get_logs(limit: int = 100) -> List[Dict]:
         binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
         
         logs_df = pd.read_excel(BytesIO(binary_content))
+        logs_df = logs_df.fillna("")
         
         if logs_df.empty:
             return []
@@ -161,6 +163,7 @@ def get_logs_stats() -> Dict:
         binary_content = client.read_binary_file(SHAREPOINT_LOGS_PATH)
         
         logs_df = pd.read_excel(BytesIO(binary_content))
+        logs_df = logs_df.fillna("")
         
         if logs_df.empty:
             return {"total": 0, "users": 0, "actions": 0}
@@ -255,6 +258,7 @@ def save_analysis_history(username: str, ticket_filename: str, question: str,
         try:
             binary_content = client.read_binary_file(SHAREPOINT_ANALYSIS_PATH)
             analysis_df = pd.read_excel(BytesIO(binary_content))
+            analysis_df = analysis_df.fillna("")
             
             expected_columns = ["timestamp", "username", "ticket_filename", "question",
                               "result", "expense_type", "justification", "amount", 
@@ -305,6 +309,7 @@ def get_analysis_history(limit: int = 100) -> List[Dict]:
         binary_content = client.read_binary_file(SHAREPOINT_ANALYSIS_PATH)
         
         analysis_df = pd.read_excel(BytesIO(binary_content))
+        analysis_df = analysis_df.fillna("")
         
         if analysis_df.empty:
             return []
@@ -374,6 +379,7 @@ def save_feedback(username: str, rating: int, comment: str = "",
         try:
             binary_content = client.read_binary_file(SHAREPOINT_FEEDBACK_PATH)
             feedback_df = pd.read_excel(BytesIO(binary_content))
+            feedback_df = feedback_df.fillna("")
             
             expected_columns = ["timestamp", "username", "rating", "comment", 
                               "issue_type", "analysis_id"]
@@ -419,6 +425,7 @@ def get_feedback_stats() -> Dict:
         binary_content = client.read_binary_file(SHAREPOINT_FEEDBACK_PATH)
         
         feedback_df = pd.read_excel(BytesIO(binary_content))
+        feedback_df = feedback_df.fillna("")
         
         if feedback_df.empty:
             return {
