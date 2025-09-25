@@ -300,121 +300,190 @@ async function loadAdminLogs() {
     loadLogsStats(); // Utilise la fonction qui charge stats + logs
 }
 
-// Afficher l'aperçu stylisé du ticket
+// Aperçu ticket façon "ticket de caisse" réaliste
 function displayTicketPreview(ticketInfo, confidence) {
     const content = document.getElementById('ticket-preview-content');
-    
-    // Déterminer le niveau de confiance
+
+    // -------- Helpers sûrs (sans dépendances) --------
+    const toFloat = (v) => {
+        if (v == null) return null;
+        const n = typeof v === 'string' ? v.replace(',', '.').replace(/[^\d.-]/g, '') : v;
+        const f = parseFloat(n);
+        return isNaN(f) ? null : f;
+    };
+    const fmtCur = (val, ccy = 'EUR', locale = 'fr-FR') => {
+        const num = toFloat(val);
+        if (num == null) return 'N/A';
+        // Affichage style ticket: cc y après montant (ex: 12,34 EUR)
+        return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + ' ' + (ccy || 'EUR');
+    };
+    const fmtDate = (d) => {
+        if (!d) return '—';
+        const date = new Date(d);
+        return isNaN(date.getTime()) ? d : date.toLocaleDateString('fr-FR') + ' ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    };
+    const pad = (s, n) => (s || '').toString().slice(0, n).padEnd(n, ' ');
+    const line = (ch='—', n=38) => ch.repeat(n);
+
+    // -------- Données & défauts --------
+    const vendor = ticketInfo.vendor || 'MERCHANT / COMMERÇANT';
+    const location = ticketInfo.location || (ticketInfo.city ? ticketInfo.city : '—');
+    const filename = ticketInfo.filename || '—';
+    const ccy = ticketInfo.currency || 'EUR';
+    const vatRate = toFloat(ticketInfo.vat_rate) ?? 20; // défaut 20% si non fourni
+    const payMethod = ticketInfo.payment_method || 'CB / CREDIT CARD';
+    const category = ticketInfo.category || 'GENERAL';
+    const ticketDate = ticketInfo.date || new Date().toISOString();
+
+    // Items: [{label, qty, unit_price}] attendus. Fallback si absent.
+    const items = Array.isArray(ticketInfo.items) && ticketInfo.items.length
+        ? ticketInfo.items.map(it => ({
+            label: it.label || 'Article',
+            qty: toFloat(it.qty) ?? 1,
+            unit_price: toFloat(it.unit_price) ?? (toFloat(ticketInfo.amount) ?? 0)
+        }))
+        : [{
+            label: category,
+            qty: 1,
+            unit_price: toFloat(ticketInfo.amount) ?? 0
+        }];
+
+    // Calculs
+    const subtotal = items.reduce((s, it) => s + (it.qty * it.unit_price), 0);
+    const vat = (vatRate > 0) ? subtotal * (vatRate / 100) : 0;
+    // Si un total TTC explicite fourni, on le respecte, sinon on additionne
+    const totalTTC = toFloat(ticketInfo.total_amount) ?? (toFloat(ticketInfo.amount) ?? (subtotal + vat));
+
+    // Confiance
     const confidenceColor = confidence >= 0.8 ? 'success' : confidence >= 0.5 ? 'warning' : 'danger';
-    const confidenceText = confidence >= 0.8 ? 'High' : confidence >= 0.5 ? 'Medium' : 'Low';
-    
-    // Générer un numéro de ticket factice
-    const ticketNumber = '#' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    const currentDate = new Date();
-    
+    const confidenceText  = confidence >= 0.8 ? 'High'    : confidence >= 0.5 ? 'Medium'  : 'Low';
+
+    // Métadonnées transaction
+    const txId = (ticketInfo.transaction_id) || ('TX' + Math.random().toString(36).slice(2,10).toUpperCase());
+    const ticketNumber = (ticketInfo.ticket_number) || ('#' + Math.random().toString(36).slice(2,6).toUpperCase());
+    const merchantId = ticketInfo.merchant_id || 'SIRET/TVA: —';
+
+    // Faux code-barres (Unicode) + QR
+    const barcodeData = (txId + ' ' + totalTTC).toUpperCase();
+    const fakeBars = '▌▌ ▌▌▌  ▌ ▌▌ ▌▌▌ ▌  ▌▌ ▌▌  ▌▌▌ ▌ ▌  ▌'.slice(0, 38);
+
+    // -------- Gabarit HTML (utilise tes classes .receipt-*) --------
     content.innerHTML = `
-        <div class="receipt-container">
-            <div class="receipt-paper">
-                <!-- Header du ticket -->
-                <div class="receipt-header">
-                    <div class="company-logo">
-                        <i class="fas fa-receipt fa-2x"></i>
-                    </div>
+        <div class="receipt-container" style="max-width: 360px;">
+            <div class="receipt-paper" style="font-family: 'Courier New', monospace; font-size: 13px;">
+                
+                <div class="receipt-header" style="padding: 1rem 1rem 0.75rem;">
+                    <div class="company-logo"><i class="fas fa-receipt"></i></div>
                     <div class="company-info">
-                        <h4>EXPENSE ANALYSIS</h4>
-                        <p class="receipt-subtitle">T&E System - APAC Region</p>
+                        <h4 style="letter-spacing:1px;">${vendor.toUpperCase()}</h4>
+                        <p class="receipt-subtitle" style="opacity:.9">${location}</p>
                     </div>
                     <div class="receipt-number">${ticketNumber}</div>
                 </div>
-                
-                <!-- Ligne de séparation -->
-                <div class="receipt-divider">
-                    <span>- - - - - - - - - - - - - - - - - - - - - -</span>
-                </div>
-                
-                <!-- Badge de confiance -->
-                <div class="confidence-badge-container">
+
+                <div class="confidence-badge-container" style="margin-top:.75rem;">
                     <div class="confidence-badge bg-${confidenceColor}">
                         <i class="fas fa-brain me-1"></i>
-                        AI Confidence: ${confidenceText} (${Math.round(confidence * 100)}%)
+                        AI Confidence: ${confidenceText} (${Math.round(confidence*100)}%)
                     </div>
                 </div>
-                
-                <!-- Détails du ticket -->
+
+                <div class="receipt-divider thin"><span>${line('-', 38)}</span></div>
+
                 <div class="receipt-details">
-                    <div class="receipt-row">
-                        <span class="item-label">DATE:</span>
-                        <span class="item-value">${ticketInfo.date || 'Not detected'}</span>
+
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">DATE</span>
+                        <span class="item-value">${fmtDate(ticketDate)}</span>
                     </div>
-                    
-                    <div class="receipt-row">
-                        <span class="item-label">VENDOR:</span>
-                        <span class="item-value">${ticketInfo.vendor || 'Unknown'}</span>
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">PAYMENT</span>
+                        <span class="item-value">${payMethod}</span>
                     </div>
-                    
-                    <div class="receipt-row">
-                        <span class="item-label">LOCATION:</span>
-                        <span class="item-value">${ticketInfo.location || 'Not specified'}</span>
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">MERCHANT ID</span>
+                        <span class="item-value">${merchantId}</span>
                     </div>
-                    
-                    <div class="receipt-row">
-                        <span class="item-label">CATEGORY:</span>
-                        <span class="item-value">${ticketInfo.category || 'General'}</span>
+
+                    <div style="margin: .5rem 0 .25rem; text-align:center;">
+                        <span style="color:#666;">${line('-', 38)}</span>
                     </div>
-                    
-                    <!-- Ligne de séparation -->
-                    <div class="receipt-divider thin">
-                        <span>- - - - - - - - - - - - - - - - - - - - - -</span>
+
+                    <!-- En-tête articles -->
+                    <div class="receipt-row" style="border-bottom:none; font-weight:bold;">
+                        <span class="item-label">ITEM</span>
+                        <span class="item-value">QTY  x  PRICE</span>
                     </div>
-                    
-                    <!-- Total -->
-                    <div class="receipt-total">
+
+                    ${items.map(it => {
+                        const lineLeft  = pad(it.label.toUpperCase(), 18);
+                        const lineRight = `${(it.qty%1?it.qty:Math.round(it.qty)).toString().padStart(3,' ')} x ${fmtCur(it.unit_price, ccy)}`;
+                        return `
+                            <div class="receipt-row" style="border-bottom:1px dotted #eee; display:block;">
+                                <pre style="margin:0; white-space:pre-wrap;">${lineLeft}    ${lineRight}</pre>
+                            </div>
+                        `;
+                    }).join('')}
+
+                    <div style="margin: .25rem 0 .25rem; text-align:center;">
+                        <span style="color:#666;">${line('-', 38)}</span>
+                    </div>
+
+                    <!-- Totaux -->
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">SOUS-TOTAL</span>
+                        <span class="item-value">${fmtCur(subtotal, ccy)}</span>
+                    </div>
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">TVA ${vatRate != null ? '('+vatRate+'%)' : ''}</span>
+                        <span class="item-value">${fmtCur(vat, ccy)}</span>
+                    </div>
+
+                    <div class="receipt-total" style="margin-top:.75rem;">
                         <div class="total-row">
-                            <span class="total-label">TOTAL AMOUNT:</span>
-                            <span class="total-amount">
-                                ${ticketInfo.amount ? `${ticketInfo.currency || 'EUR'} ${ticketInfo.amount}` : 'N/A'}
-                            </span>
+                            <span class="total-label" style="letter-spacing:1px;">TOTAL TTC</span>
+                            <span class="total-amount">${fmtCur(totalTTC, ccy)}</span>
                         </div>
+                    </div>
+
+                    <div style="margin: .5rem 0 .25rem; text-align:center;">
+                        <span style="color:#666;">${line('-', 38)}</span>
+                    </div>
+
+                    <!-- Infos pied -->
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">TRANSACTION</span>
+                        <span class="item-value">${txId}</span>
+                    </div>
+                    <div class="receipt-row" style="border-bottom:none;">
+                        <span class="item-label">FICHIER</span>
+                        <span class="item-value">${filename}</span>
                     </div>
                 </div>
-                
-                <!-- Footer -->
+
                 <div class="receipt-footer">
-                    <div class="receipt-divider">
-                        <span>- - - - - - - - - - - - - - - - - - - - - -</span>
+                    <div class="qr-section" style="margin-top:.5rem;">
+                        <!-- Faux code-barres -->
+                        <pre class="qr-code" style="margin:0; font-size:18px; letter-spacing:1px; line-height:1;">${fakeBars}</pre>
+                        <p class="qr-label" style="margin-top:.25rem;">${barcodeData}</p>
                     </div>
-                    
-                    <div class="footer-info">
-                        <p class="extraction-info">
-                            <i class="fas fa-file-alt me-1"></i>
-                            Source: ${ticketInfo.filename || 'Unknown file'}
+                    <div class="footer-info" style="text-align:center; margin-top:.5rem;">
+                        <p style="justify-content:center;">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Conservez ce ticket pour votre comptabilité
                         </p>
-                        <p class="processing-time">
-                            <i class="fas fa-clock me-1"></i>
-                            Processed: ${currentDate.toLocaleDateString()} ${currentDate.toLocaleTimeString()}
-                        </p>
-                        <p class="system-info">
-                            <i class="fas fa-robot me-1"></i>
-                            Powered by AI Analysis System
-                        </p>
-                    </div>
-                    
-                    <!-- QR Code factice -->
-                    <div class="qr-section">
-                        <div class="qr-code">
-                            <i class="fas fa-qrcode fa-2x"></i>
-                        </div>
-                        <p class="qr-label">Scan for details</p>
+                        <p style="justify-content:center;">Merci de votre visite • See you soon</p>
                     </div>
                 </div>
             </div>
-            
-            <!-- Effet de perforation -->
+
+            <!-- Perforations déjà stylées par ton CSS -->
             <div class="perforations top"></div>
             <div class="perforations bottom"></div>
         </div>
     `;
 }
+
 
 // Afficher les erreurs de preview
 function displayPreviewError(errorMessage) {
