@@ -305,105 +305,113 @@ function displayTicketPreview(ticketInfo, confidence) {
     const content = document.getElementById('ticket-preview-content');
     
     // Déterminer le niveau de confiance
-    const confidenceLevel = confidence >= 0.8 ? 'high' : confidence >= 0.5 ? 'medium' : 'low';
     const confidenceColor = confidence >= 0.8 ? 'success' : confidence >= 0.5 ? 'warning' : 'danger';
     const confidenceText = confidence >= 0.8 ? 'High' : confidence >= 0.5 ? 'Medium' : 'Low';
     
+    // Générer un numéro de ticket factice
+    const ticketNumber = '#' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const currentDate = new Date();
+    
     content.innerHTML = `
-        <div class="ticket-preview-container">
-            <!-- En-tête du ticket -->
-            <div class="ticket-header text-center mb-4">
-                <div class="ticket-logo mb-2">
-                    <i class="fas fa-receipt fa-3x text-primary"></i>
+        <div class="receipt-container">
+            <div class="receipt-paper">
+                <!-- Header du ticket -->
+                <div class="receipt-header">
+                    <div class="company-logo">
+                        <i class="fas fa-receipt fa-2x"></i>
+                    </div>
+                    <div class="company-info">
+                        <h4>EXPENSE ANALYSIS</h4>
+                        <p class="receipt-subtitle">T&E System - APAC Region</p>
+                    </div>
+                    <div class="receipt-number">${ticketNumber}</div>
                 </div>
-                <h4 class="ticket-title">Expense Ticket</h4>
-                <div class="badge bg-${confidenceColor} mb-2">
-                    Extraction Confidence: ${confidenceText} (${Math.round(confidence * 100)}%)
+                
+                <!-- Ligne de séparation -->
+                <div class="receipt-divider">
+                    <span>- - - - - - - - - - - - - - - - - - - - - -</span>
                 </div>
-            </div>
-            
-            <!-- Corps du ticket -->
-            <div class="ticket-body">
-                <div class="row g-3">
-                    <!-- Montant principal -->
-                    <div class="col-12 text-center mb-4">
-                        <div class="amount-display">
-                            <div class="amount-label">Total Amount</div>
-                            <div class="amount-value">
-                                ${ticketInfo.amount ? `${ticketInfo.amount} ${ticketInfo.currency || 'EUR'}` : 'Not detected'}
-                            </div>
-                        </div>
+                
+                <!-- Badge de confiance -->
+                <div class="confidence-badge-container">
+                    <div class="confidence-badge bg-${confidenceColor}">
+                        <i class="fas fa-brain me-1"></i>
+                        AI Confidence: ${confidenceText} (${Math.round(confidence * 100)}%)
+                    </div>
+                </div>
+                
+                <!-- Détails du ticket -->
+                <div class="receipt-details">
+                    <div class="receipt-row">
+                        <span class="item-label">DATE:</span>
+                        <span class="item-value">${ticketInfo.date || 'Not detected'}</span>
                     </div>
                     
-                    <!-- Détails en colonnes -->
-                    <div class="col-md-6">
-                        <div class="ticket-field">
-                            <div class="field-label">
-                                <i class="fas fa-calendar me-2"></i>Date
-                            </div>
-                            <div class="field-value">
-                                ${ticketInfo.date || 'Not detected'}
-                            </div>
-                        </div>
+                    <div class="receipt-row">
+                        <span class="item-label">VENDOR:</span>
+                        <span class="item-value">${ticketInfo.vendor || 'Unknown'}</span>
                     </div>
                     
-                    <div class="col-md-6">
-                        <div class="ticket-field">
-                            <div class="field-label">
-                                <i class="fas fa-store me-2"></i>Vendor
-                            </div>
-                            <div class="field-value">
-                                ${ticketInfo.vendor || 'Not detected'}
-                            </div>
-                        </div>
+                    <div class="receipt-row">
+                        <span class="item-label">LOCATION:</span>
+                        <span class="item-value">${ticketInfo.location || 'Not specified'}</span>
                     </div>
                     
-                    <div class="col-md-6">
-                        <div class="ticket-field">
-                            <div class="field-label">
-                                <i class="fas fa-tag me-2"></i>Category
-                            </div>
-                            <div class="field-value">
-                                <span class="badge bg-secondary">${ticketInfo.category || 'Unknown'}</span>
-                                ${ticketInfo.subcategory ? `<small class="text-muted ms-2">(${ticketInfo.subcategory})</small>` : ''}
-                            </div>
-                        </div>
+                    <div class="receipt-row">
+                        <span class="item-label">CATEGORY:</span>
+                        <span class="item-value">${ticketInfo.category || 'General'}</span>
                     </div>
                     
-                    <div class="col-md-6">
-                        <div class="ticket-field">
-                            <div class="field-label">
-                                <i class="fas fa-map-marker-alt me-2"></i>Location
-                            </div>
-                            <div class="field-value">
-                                ${ticketInfo.location || 'Not detected'}
-                                ${ticketInfo.country_code ? `<span class="badge bg-light text-dark ms-2">${ticketInfo.country_code}</span>` : ''}
-                            </div>
+                    <!-- Ligne de séparation -->
+                    <div class="receipt-divider thin">
+                        <span>- - - - - - - - - - - - - - - - - - - - - -</span>
+                    </div>
+                    
+                    <!-- Total -->
+                    <div class="receipt-total">
+                        <div class="total-row">
+                            <span class="total-label">TOTAL AMOUNT:</span>
+                            <span class="total-amount">
+                                ${ticketInfo.amount ? `${ticketInfo.currency || 'EUR'} ${ticketInfo.amount}` : 'N/A'}
+                            </span>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Pied de ticket -->
-            <div class="ticket-footer mt-4 pt-3 border-top">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <small class="text-muted">
-                            <i class="fas fa-file me-1"></i>
-                            Source: ${ticketInfo.filename}
-                        </small><br>
-                        <small class="text-muted">
+                
+                <!-- Footer -->
+                <div class="receipt-footer">
+                    <div class="receipt-divider">
+                        <span>- - - - - - - - - - - - - - - - - - - - - -</span>
+                    </div>
+                    
+                    <div class="footer-info">
+                        <p class="extraction-info">
+                            <i class="fas fa-file-alt me-1"></i>
+                            Source: ${ticketInfo.filename || 'Unknown file'}
+                        </p>
+                        <p class="processing-time">
+                            <i class="fas fa-clock me-1"></i>
+                            Processed: ${currentDate.toLocaleDateString()} ${currentDate.toLocaleTimeString()}
+                        </p>
+                        <p class="system-info">
                             <i class="fas fa-robot me-1"></i>
-                            Extracted using AI • ${ticketInfo.extraction_method || 'ai_rag'}
-                        </small>
+                            Powered by AI Analysis System
+                        </p>
                     </div>
-                    <div class="col-md-4 text-end">
-                        <small class="text-muted">
-                            ${new Date().toLocaleDateString()}
-                        </small>
+                    
+                    <!-- QR Code factice -->
+                    <div class="qr-section">
+                        <div class="qr-code">
+                            <i class="fas fa-qrcode fa-2x"></i>
+                        </div>
+                        <p class="qr-label">Scan for details</p>
                     </div>
                 </div>
             </div>
+            
+            <!-- Effet de perforation -->
+            <div class="perforations top"></div>
+            <div class="perforations bottom"></div>
         </div>
     `;
 }
