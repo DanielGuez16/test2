@@ -399,40 +399,60 @@ async def view_excel_document(session_token: Optional[str] = Cookie(None)):
 
 @app.get("/api/view-word")  
 async def view_word_document(session_token: Optional[str] = Cookie(None)):
-    """Visualise le document Word avec prévisualisation Graph API"""
+    """Visualise le document Word chargé"""
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
+    # DEBUG: Vérifier le contenu des documents T&E
+    logger.info(f"DEBUG - te_documents keys: {list(te_documents.keys())}")
+    logger.info(f"DEBUG - word_policies exists: {bool(te_documents.get('word_policies'))}")
+    if te_documents.get("word_policies"):
+        logger.info(f"DEBUG - word_policies length: {len(te_documents['word_policies'])}")
+        logger.info(f"DEBUG - word_policies preview: {te_documents['word_policies'][:200]}...")
+    
+    if not te_documents["word_policies"]:
+        raise HTTPException(status_code=404, detail="No Word document loaded")
+    
     try:
-        sharepoint_client = SharePointClient()
-        word_path = "Chatbot/sources/APAC Travel Entertainment Procedure Mar2025_Clean.docx"
+        # Diviser le texte en sections pour l'affichage
+        text = te_documents["word_policies"]
+        sections = []
         
-        # Essayer d'abord la prévisualisation HTML
-        preview_result = sharepoint_client.get_file_preview_html(word_path)
+        # DEBUG: Informations sur le traitement
+        logger.info(f"DEBUG - Processing text of length: {len(text)}")
         
-        if preview_result.get('success'):
-            return {
-                "success": True,
-                "filename": "APAC Travel Entertainment Procedure.docx", 
-                "preview_type": "iframe",
-                "embed_url": preview_result['html'],
-                "last_loaded": te_documents["last_loaded"]
-            }
-        else:
-            # Fallback vers texte brut si prévisualisation échoue
-            word_binary = sharepoint_client.read_binary_file(word_path)
-            word_text = sharepoint_client.read_docx_file_as_text(word_binary)
-            
-            sections = [{"title": "T&E Policies", "content": word_text}]
-            
-            return {
-                "success": True,
-                "filename": "APAC Travel Entertainment Procedure.docx",
-                "preview_type": "text", 
-                "sections": sections,
-                "last_loaded": te_documents["last_loaded"]
-            }
+        # Diviser par paragraphes
+        paragraphs = text.split('\n\n')
+        logger.info(f"DEBUG - Found {len(paragraphs)} paragraphs")
+        
+        current_section = {"title": "T&E Policies", "content": ""}
+        
+        for i, para in enumerate(paragraphs[:50]):  # Limiter à 50 paragraphes
+            if len(para.strip()) > 0:
+                if len(current_section["content"]) > 2000:  # Nouvelle section tous les 2000 chars
+                    sections.append(current_section)
+                    current_section = {"title": f"Section {len(sections) + 1}", "content": para}
+                else:
+                    current_section["content"] += "\n\n" + para
+        
+        if current_section["content"]:
+            sections.append(current_section)
+        
+        logger.info(f"DEBUG - Created {len(sections)} sections")
+        for i, section in enumerate(sections):
+            logger.info(f"DEBUG - Section {i}: title='{section['title']}', content_length={len(section['content'])}")
+        
+        result = {
+            "success": True,
+            "filename": "APAC Travel Entertainment Procedure.docx",
+            "sections": sections,
+            "total_sections": len(sections),
+            "last_loaded": te_documents["last_loaded"]
+        }
+        
+        logger.info(f"DEBUG - Returning result with {len(sections)} sections")
+        return result
         
     except Exception as e:
         logger.error(f"Erreur visualisation Word: {e}")

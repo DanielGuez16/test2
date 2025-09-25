@@ -1852,59 +1852,67 @@ function createExcelTable(sheetData) {
     return html;
 }
 
+
 async function loadWordContent() {
     const contentDiv = document.getElementById('word-content');
     if (!contentDiv) return;
     
     try {
+        console.log('DEBUG - Calling /api/view-word...');
         const response = await fetch('/api/view-word');
+        console.log('DEBUG - Response status:', response.status);
+        
         const result = await response.json();
+        console.log('DEBUG - API result:', result);
         
         if (result.success) {
-            if (result.preview_type === 'iframe') {
-                // Affichage iframe avec prévisualisation Office
-                contentDiv.innerHTML = `
-                    <div class="mb-3">
+            console.log('DEBUG - Success, processing sections...');
+            console.log('DEBUG - Sections count:', result.sections?.length);
+            
+            let html = `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
                         <h6><i class="fas fa-file-word text-primary me-2"></i>${result.filename}</h6>
-                        <small class="text-muted">Office Online Preview • Last loaded: ${formatDateTime(result.last_loaded)}</small>
+                        <div>
+                            <span class="badge bg-primary">${result.total_sections} Sections</span>
+                        </div>
                     </div>
-                    <div class="office-preview-container" style="height: 600px; border: 1px solid #ddd; border-radius: 8px;">
-                        <iframe 
-                            src="${result.embed_url}" 
-                            style="width: 100%; height: 100%; border: none;"
-                            sandbox="allow-scripts allow-same-origin"
-                            title="Word Document Preview">
-                        </iframe>
-                    </div>
-                `;
-            } else {
-                // Fallback vers affichage texte
-                let html = `
-                    <div class="mb-3">
-                        <h6><i class="fas fa-file-word text-primary me-2"></i>${result.filename}</h6>
-                        <small class="text-muted">Text Preview • Last loaded: ${formatDateTime(result.last_loaded)}</small>
-                    </div>
-                    <div class="word-document-viewer">
-                `;
-                
-                result.sections.forEach(section => {
+                    <small class="text-muted">Last loaded: ${formatDateTime(result.last_loaded)}</small>
+                </div>
+            `;
+            
+            // Style PDF-like pour le contenu Word
+            html += '<div class="word-document-viewer">';
+            
+            if (result.sections && result.sections.length > 0) {
+                result.sections.forEach((section, index) => {
+                    console.log(`DEBUG - Processing section ${index}:`, section.title, section.content?.length);
                     html += `
                         <div class="word-section mb-4">
-                            <h5 class="section-title text-primary border-bottom pb-2">${escapeHtml(section.title)}</h5>
-                            <div class="section-content">${formatWordContent(section.content)}</div>
+                            <h5 class="section-title text-primary border-bottom pb-2">
+                                ${escapeHtml(section.title)}
+                            </h5>
+                            <div class="section-content">
+                                ${formatWordContent(section.content)}
+                            </div>
                         </div>
                     `;
                 });
-                
-                html += '</div>';
-                contentDiv.innerHTML = html;
+            } else {
+                html += '<div class="alert alert-warning">No sections found in document</div>';
             }
+            
+            html += '</div>';
+            
+            console.log('DEBUG - Generated HTML length:', html.length);
+            contentDiv.innerHTML = html;
+            
         } else {
             throw new Error(result.detail || 'Failed to load Word content');
         }
         
     } catch (error) {
-        console.error('Error loading Word content:', error);
+        console.error('ERROR loading Word content:', error);
         contentDiv.innerHTML = `
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle me-2"></i>
@@ -1913,6 +1921,7 @@ async function loadWordContent() {
         `;
     }
 }
+
 
 function formatWordContent(content) {
     // Formatage pour ressembler à un document PDF
