@@ -1500,6 +1500,159 @@
                 font-size: 1.25rem;
             }
         }
+
+        /* Table of contents automatique pour les longs documents */
+        .document-toc {
+            background: linear-gradient(135deg, #f8f9ff, #ffffff);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .toc-title {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .toc-item {
+            color: var(--primary);
+            text-decoration: none;
+            display: block;
+            padding: 0.25rem 0;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .toc-item:hover {
+            background: rgba(118, 39, 155, 0.1);
+            padding-left: 0.5rem;
+            color: var(--primary);
+        }
+
+        /* Améliorer la typographie */
+        .section-content h4,
+        .section-content h5 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-content p {
+            margin-bottom: 1.2rem;
+            text-indent: 1rem;
+        }
+
+        .section-content p:first-child {
+            text-indent: 0;
+        }
+
+        /* Highlight pour les montants et pourcentages */
+        .highlight-amount {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            border: 1px solid #ffc107;
+        }
+
+        /* Style pour les tableaux si le document en contient */
+        .document-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .document-table th {
+            background: var(--primary);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .document-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .document-table tr:hover td {
+            background: rgba(118, 39, 155, 0.05);
+        }
+
+        .enhanced-list {
+    list-style: none;
+    padding: 0;
+}
+
+.enhanced-list-item {
+    background: white;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+    transition: all 0.2s ease;
+}
+
+.enhanced-list-item:hover {
+    background: rgba(118, 39, 155, 0.02);
+    transform: translateX(3px);
+}
+
+.list-item-content {
+    padding: 0.75rem 1rem;
+}
+
+.enhanced-definition {
+    background: linear-gradient(135deg, #f8f9ff, #ffffff);
+    border: 1px solid rgba(118, 39, 155, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.definition-term {
+    background: var(--primary);
+    color: white;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+}
+
+.definition-content {
+    padding: 1rem;
+}
+
+.enhanced-alert {
+    display: flex;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.alert-icon {
+    color: #856404;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+    margin-top: 0.1rem;
+}
+
+.alert-content {
+    flex: 1;
+    color: #856404;
+    font-weight: 500;
+}
+
+.enhanced-paragraph {
+    margin-bottom: 1.2rem;
+    line-height: 1.7;
+    text-align: justify;
+    hyphens: auto;
+}
     </style>
 </head>
 <body>

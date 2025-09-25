@@ -1922,38 +1922,60 @@ async function loadWordContent() {
     }
 }
 
-
 function formatWordContent(content) {
     if (!content) return '';
     
-    return content
-        .split('\n\n')
+    // Détecter et highlight les montants/pourcentages
+    const highlightAmounts = (text) => {
+        return text
+            .replace(/(\$[\d,]+\.?\d*|\€[\d,]+\.?\d*|[\d,]+\.?\d*\s*(EUR|USD|GBP))/g, 
+                '<span class="highlight-amount">$1</span>')
+            .replace(/(\d+\.?\d*%)/g, 
+                '<span class="highlight-amount">$1</span>');
+    };
+    
+    const sections = content.split('\n\n');
+    let hasStructure = false;
+    
+    const processedContent = sections
         .map(paragraph => {
             if (!paragraph.trim()) return '';
             
             const p = paragraph.trim();
             
-            // Détecter les titres principaux (tout en majuscules ou mots-clés spécifiques)
-            if (p.match(/^[A-Z\s]{15,}$/) || p.match(/^(SECTION|ARTICLE|CHAPTER|PROCEDURE|POLICY|GUIDELINES)/i)) {
-                return `<h4 class="text-primary fw-bold mt-4 mb-3 border-bottom pb-2">${escapeHtml(p)}</h4>`;
+            // Titres principaux
+            if (p.match(/^[A-Z\s]{15,}$/) || p.match(/^(SECTION|ARTICLE|CHAPTER|PROCEDURE|POLICY|GUIDELINES|DEFINITIONS)/i)) {
+                hasStructure = true;
+                return `
+                    <div class="section-title-container mt-4">
+                        <h4 class="text-primary fw-bold mb-3 border-bottom pb-2" id="section-${p.toLowerCase().replace(/\s+/g, '-')}">
+                            <i class="fas fa-bookmark me-2"></i>${escapeHtml(p)}
+                        </h4>
+                    </div>
+                `;
             }
             
-            // Détecter les sous-titres (premières lettres en majuscules)
+            // Sous-titres
             if (p.match(/^[A-Z][a-z].*:$/) || p.match(/^\d+\.\s*[A-Z]/)) {
-                return `<h5 class="text-secondary fw-semibold mt-3 mb-2">${escapeHtml(p)}</h5>`;
+                return `
+                    <h5 class="text-secondary fw-semibold mt-3 mb-2">
+                        <i class="fas fa-chevron-right me-2 text-primary"></i>${escapeHtml(p)}
+                    </h5>
+                `;
             }
             
-            // Détecter les listes avec puces ou numéros
+            // Listes améliorées
             if (p.includes('•') || p.match(/^\s*[-*]\s/) || p.match(/^\s*\d+\.\s/)) {
                 const listItems = p.split(/[•\-*]|\d+\./).filter(item => item.trim());
                 if (listItems.length > 1) {
-                    let listHtml = '<ul class="list-group list-group-flush mb-3">';
-                    listItems.forEach(item => {
+                    let listHtml = '<ul class="enhanced-list mb-3">';
+                    listItems.forEach((item, index) => {
                         if (item.trim()) {
                             listHtml += `
-                                <li class="list-group-item border-0 ps-0 py-2">
-                                    <i class="fas fa-chevron-right text-primary me-2" style="font-size: 0.8rem;"></i>
-                                    <span>${escapeHtml(item.trim())}</span>
+                                <li class="enhanced-list-item">
+                                    <div class="list-item-content">
+                                        ${highlightAmounts(escapeHtml(item.trim()))}
+                                    </div>
                                 </li>
                             `;
                         }
@@ -1963,36 +1985,57 @@ function formatWordContent(content) {
                 }
             }
             
-            // Détecter les définitions (contient ":" au milieu)
+            // Définitions améliorées
             if (p.includes(':') && !p.endsWith(':') && p.split(':').length === 2) {
                 const [term, definition] = p.split(':');
                 return `
-                    <div class="definition-item mb-3 p-3 bg-light rounded-3 border-start border-4 border-primary">
-                        <strong class="text-primary">${escapeHtml(term.trim())}:</strong>
-                        <span class="ms-2">${escapeHtml(definition.trim())}</span>
+                    <div class="enhanced-definition mb-3">
+                        <div class="definition-term">
+                            <i class="fas fa-tag me-2"></i>
+                            ${escapeHtml(term.trim())}
+                        </div>
+                        <div class="definition-content">
+                            ${highlightAmounts(escapeHtml(definition.trim()))}
+                        </div>
                     </div>
                 `;
             }
             
-            // Détecter les notes importantes (contient certains mots-clés)
-            if (p.match(/\b(important|note|attention|warning|caution|remember)\b/i)) {
+            // Notes importantes
+            if (p.match(/\b(important|note|attention|warning|caution|remember|mandatory|required)\b/i)) {
+                const iconMap = {
+                    'warning': 'exclamation-triangle',
+                    'caution': 'exclamation-triangle', 
+                    'important': 'star',
+                    'mandatory': 'gavel',
+                    'required': 'gavel'
+                };
+                const matchedWord = p.match(/\b(important|note|attention|warning|caution|remember|mandatory|required)\b/i)?.[0]?.toLowerCase();
+                const icon = iconMap[matchedWord] || 'info-circle';
+                
                 return `
-                    <div class="alert alert-info border-0 mb-3" style="border-left: 4px solid var(--info) !important;">
-                        <i class="fas fa-info-circle me-2"></i>
-                        ${escapeHtml(p)}
+                    <div class="enhanced-alert mb-3">
+                        <div class="alert-icon">
+                            <i class="fas fa-${icon}"></i>
+                        </div>
+                        <div class="alert-content">
+                            ${highlightAmounts(escapeHtml(p))}
+                        </div>
                     </div>
                 `;
             }
             
-            // Paragraphe normal avec meilleur styling
+            // Paragraphe normal
             return `
-                <p class="mb-3 lh-lg text-justify" style="text-align: justify; hyphens: auto;">
-                    ${escapeHtml(p)}
+                <p class="enhanced-paragraph">
+                    ${highlightAmounts(escapeHtml(p))}
                 </p>
             `;
         })
-        .filter(item => item) // Supprimer les éléments vides
+        .filter(item => item)
         .join('');
+
+    return processedContent;
 }
 
 async function refreshDocuments() {
