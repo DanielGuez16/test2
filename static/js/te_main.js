@@ -300,7 +300,7 @@ async function loadAdminLogs() {
     loadLogsStats(); // Utilise la fonction qui charge stats + logs
 }
 
-// Aperçu ticket façon "ticket de caisse" réaliste
+// Afficher l'aperçu stylisé du ticket façon "ticket de caisse" réaliste
 function displayTicketPreview(ticketInfo, confidence) {
     const content = document.getElementById('ticket-preview-content');
 
@@ -314,7 +314,7 @@ function displayTicketPreview(ticketInfo, confidence) {
     const fmtCur = (val, ccy = 'EUR', locale = 'fr-FR') => {
         const num = toFloat(val);
         if (num == null) return 'N/A';
-        // Affichage style ticket: cc y après montant (ex: 12,34 EUR)
+        // Affichage style ticket: ccy après montant (ex: 12,34 EUR)
         return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + ' ' + (ccy || 'EUR');
     };
     const fmtDate = (d) => {
@@ -483,7 +483,6 @@ function displayTicketPreview(ticketInfo, confidence) {
         </div>
     `;
 }
-
 
 // Afficher les erreurs de preview
 function displayPreviewError(errorMessage) {

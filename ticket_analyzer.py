@@ -33,11 +33,11 @@ class TicketAnalyzer:
         try:
             # Construire le contexte complet avec TOUTES les données
             full_context = self._build_complete_context(te_documents)
-            
-            # Construire le prompt d'analyse
+
+            # Construire le prompt d'analyse STRUCTURÉ avec raisonnement en étapes
             prompt = f"""
             QUESTION: {user_question if user_question else "Analyze this T&E expense according to company policies."}
-            
+
             TICKET INFORMATION:
             - Amount: {ticket_info.get('amount', 'Not detected')} {ticket_info.get('currency', 'N/A')}
             - Category: {ticket_info.get('category', 'Unknown')}
@@ -46,28 +46,55 @@ class TicketAnalyzer:
             - Location: {ticket_info.get('location', 'Not detected')}
 
             ANALYSIS REQUIREMENTS:
-            1. Search the CONSOLIDATED LIMITS above for exact matching rules (country/currency/type)
-            2. Compare the ticket amount against the CONSOLIDATED LIMITS
-            3. Extract relevant policy content from the TRAVEL & ENTERTAINMENT PROCEDURES if applicable
-            4. Provide PASS or FAIL decision with specific reasoning
-            5. Quote the exact rule or policy section that applies
-            6. Give precise answers with specific numbers, currencies, and details
-            7. Give specific recommendations if non-compliant
-            
-            Provide a professional business analysis in paragraph format.
+            You must respond in this EXACT format:
+
+            DECISION: [PASS or FAIL - exactly one word]
+            EXPENSE_TYPE: [Hotel/Meal/Transport/etc.]
+            AMOUNT: [NUM CURRENCY]
+            ANALYSIS: [Your detailed analysis here]
+
+            MANDATORY REASONING PROCESS:
+            STEP 1 - CONSOLIDATED LIMITS CHECK:
+            - Identify the exact country, currency, and expense type from the ticket
+            - Search CONSOLIDATED LIMITS for matching rule (country + currency + type)
+            - Compare ticket amount vs limit amount
+            - State: "LIMITS CHECK: PASS/FAIL - [specific rule and amounts]"
+
+            STEP 2 - TRAVEL & ENTERTAINMENT PROCEDURES CHECK:  
+            - Search TRAVEL & ENTERTAINMENT PROCEDURES for relevant policies
+            - Check if expense complies with general T&E procedures (timing, documentation, business purpose, etc.)
+            - Quote the complete relevant policy section, not just the title
+            - State: "PROCEDURES CHECK: PASS/FAIL - [specific policy quoted]"
+
+            STEP 3 - FINAL DECISION:
+            - DECISION = PASS only if BOTH Step 1 AND Step 2 are PASS
+            - DECISION = FAIL if either Step 1 OR Step 2 is FAIL
+            - If no applicable rule found in either source: DECISION = FAIL
+
+            Rules:
+            1. DECISION must be exactly "PASS" or "FAIL" - nothing else
+            2. Follow the 3-step reasoning process above
+            3. Quote exact amounts, currencies, and complete policy text
+            4. Be specific about which rules apply from both sources
+            5. Always check BOTH consolidated limits AND procedures
+            6. If missing information prevents proper analysis: DECISION = FAIL
+
+            Provide a professional business analysis following the 3-step process.
             """
             
             # Appel direct à l'IA avec contexte complet
             ai_response = self.llm_connector.get_llm_response(prompt, full_context)
             
-            # Retourner la réponse brute de l'IA
+            # Parser la réponse structurée
+            parsed_response = self._parse_structured_response(ai_response)
+            
             return {
-                'result': 'PASS' if 'PASS' in ai_response.upper() else 'FAIL',
-                'expense_type': self._extract_expense_type(ticket_info),
-                'justification': ai_response,  # Réponse complète de l'IA
-                'comment': ai_response,  # Même contenu
+                'result': parsed_response['decision'],
+                'expense_type': parsed_response['expense_type'],
+                'justification': parsed_response['analysis'],
+                'comment': parsed_response['analysis'],
                 'confidence_score': 0.95,
-                'applied_rules': [],  # Pas besoin avec l'approche directe
+                'applied_rules': [],
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -81,6 +108,39 @@ class TicketAnalyzer:
                 'confidence_score': 0.0,
                 'timestamp': datetime.now().isoformat()
             }
+
+    def _parse_structured_response(self, ai_response: str) -> dict:
+        """Parse une réponse IA structurée avec montant"""
+        import re
+        
+        # Patterns pour extraire chaque section
+        decision_pattern = r'DECISION:\s*(PASS|FAIL)'
+        expense_type_pattern = r'EXPENSE_TYPE:\s*([^\n]+)'
+        amount_pattern = r'AMOUNT:\s*([^\n]+)'
+        analysis_pattern = r'ANALYSIS:\s*(.*?)(?=\n\n|\Z)'
+        
+        # Extraction avec regex
+        decision_match = re.search(decision_pattern, ai_response, re.IGNORECASE)
+        expense_type_match = re.search(expense_type_pattern, ai_response, re.IGNORECASE)
+        amount_match = re.search(amount_pattern, ai_response, re.IGNORECASE)
+        analysis_match = re.search(analysis_pattern, ai_response, re.IGNORECASE | re.DOTALL)
+        
+        # Résultats avec fallbacks sécurisés
+        decision = decision_match.group(1).upper() if decision_match else 'FAIL'
+        expense_type = expense_type_match.group(1).strip() if expense_type_match else 'Unknown'
+        amount = amount_match.group(1).strip() if amount_match else 'Not detected'
+        analysis = analysis_match.group(1).strip() if analysis_match else ai_response
+        
+        # Validation finale
+        if decision not in ['PASS', 'FAIL']:
+            decision = 'FAIL'
+        
+        return {
+            'decision': decision,
+            'expense_type': expense_type,
+            'amount': amount,
+            'analysis': analysis
+        }
 
     def _extract_expense_type(self, ticket_info: dict) -> str:
         """Extrait le type de dépense de manière simple"""
