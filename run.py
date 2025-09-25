@@ -873,10 +873,11 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
             }
                 
         elif file_ext == '.pdf':
-            # PDF - extraire le texte
+            # PDF - essayer d'extraire le texte d'abord
             try:
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
                 text_parts = []
+                
                 for page in pdf_reader.pages:
                     page_text = page.extract_text()
                     if page_text.strip():
@@ -884,37 +885,117 @@ def extract_ticket_information(file_content: bytes, filename: str) -> dict:
                 
                 text = "\n".join(text_parts)
                 
-                # Si pas de texte extrait, essayer OCR sur PDF
+                # Si pas de texte extrait, c'est probablement un PDF-image
                 if not text.strip():
+                    logger.info(f"PDF sans texte détecté, tentative conversion image: {filename}")
+                    
+                    # Essayer de convertir le PDF en image avec Pillow + PyPDF2
                     try:
-                        import fitz  # PyMuPDF
-                        pdf_doc = fitz.open(stream=file_content, filetype="pdf")
-                        
-                        for page_num in range(len(pdf_doc)):
-                            page = pdf_doc[page_num]
-                            mat = fitz.Matrix(2, 2)
+                        # Méthode simple : utiliser fitz si disponible, sinon fallback
+                        try:
+                            import fitz  # PyMuPDF
+                            pdf_doc = fitz.open(stream=file_content, filetype="pdf")
+                            
+                            # Prendre la première page
+                            page = pdf_doc[0]
+                            
+                            # Convertir en image haute résolution
+                            mat = fitz.Matrix(2.0, 2.0)  # Zoom x2 pour meilleure qualité
                             pix = page.get_pixmap(matrix=mat)
                             img_data = pix.tobytes("png")
                             
-                            image = Image.open(io.BytesIO(img_data))
-                            image = preprocess_image_for_ocr(image)
+                            pdf_doc.close()
                             
-                            page_text = pytesseract.image_to_string(image)
-                            if page_text.strip():
-                                text_parts.append(page_text)
-                        
-                        text = "\n".join(text_parts)
-                        logger.info(f"PDF OCR extrait {len(text)} caractères")
-                        
-                    except ImportError:
-                        logger.warning("PyMuPDF non disponible pour OCR PDF")
+                            # Traiter comme une image avec notre pipeline OCR
+                            from advanced_ocr import AdvancedOCRProcessor
+                            processor = AdvancedOCRProcessor()
+                            result = processor.process_ticket_image(img_data, filename)
+                            
+                            return {
+                                "filename": filename,
+                                "raw_text": result.get("raw_text", ""),
+                                "file_type": file_ext,
+                                "extraction_method": "pdf_to_image_ocr",
+                                "ocr_confidence": result.get("average_confidence", 0.0),
+                                "amount": result.get("total"),
+                                "currency": result.get("currency", "EUR"),
+                                "vendor": result.get("merchant"),
+                                "date": result.get("date"),
+                                "category": "unknown"
+                            }
+                            
+                        except ImportError:
+                            logger.warning("PyMuPDF non disponible, tentative alternative...")
+                            
+                            # Alternative avec pdf2image si disponible
+                            try:
+                                from pdf2image import convert_from_bytes
+                                
+                                # Convertir première page en image
+                                images = convert_from_bytes(file_content, first_page=1, last_page=1, dpi=200)
+                                
+                                if images:
+                                    # Convertir PIL en bytes pour notre pipeline
+                                    img_buffer = io.BytesIO()
+                                    images[0].save(img_buffer, format='PNG')
+                                    img_data = img_buffer.getvalue()
+                                    
+                                    # Traiter avec OCR
+                                    from advanced_ocr import AdvancedOCRProcessor
+                                    processor = AdvancedOCRProcessor()
+                                    result = processor.process_ticket_image(img_data, filename)
+                                    
+                                    return {
+                                        "filename": filename,
+                                        "raw_text": result.get("raw_text", ""),
+                                        "file_type": file_ext,
+                                        "extraction_method": "pdf2image_ocr",
+                                        "ocr_confidence": result.get("average_confidence", 0.0),
+                                        "amount": result.get("total"),
+                                        "currency": result.get("currency", "EUR"),
+                                        "vendor": result.get("merchant"),
+                                        "date": result.get("date"),
+                                        "category": "unknown"
+                                    }
+                                    
+                            except ImportError:
+                                logger.warning("pdf2image non disponible")
+                                
+                                # Dernier fallback : message explicatif
+                                return {
+                                    "filename": filename,
+                                    "raw_text": "",
+                                    "file_type": file_ext,
+                                    "extraction_method": "pdf_image_unsupported",
+                                    "error": "PDF contains images but no conversion library available. Please install PyMuPDF (pip install PyMuPDF) or convert to JPG/PNG manually."
+                                }
+                    
                     except Exception as e:
-                        logger.warning(f"Erreur OCR PDF: {e}")
-                
+                        logger.error(f"Erreur conversion PDF-image: {e}")
+                        return {
+                            "filename": filename,
+                            "error": f"PDF image conversion failed: {str(e)}",
+                            "raw_text": "",
+                            "file_type": file_ext
+                        }
+                else:
+                    # PDF avec texte extractible
+                    return {
+                        "filename": filename,
+                        "raw_text": text,
+                        "file_type": file_ext,
+                        "extraction_method": "pdf_text"
+                    }
+                    
             except Exception as e:
                 logger.warning(f"Erreur lecture PDF: {e}")
-                text = f"PDF file {filename} - text extraction failed"
-        
+                return {
+                    "filename": filename,
+                    "error": f"PDF processing failed: {str(e)}",
+                    "raw_text": "",
+                    "file_type": file_ext
+                }
+
         elif file_ext in ['.docx', '.doc']:
             # Documents Word
             try:
