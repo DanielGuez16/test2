@@ -40,9 +40,6 @@ from context_builder import TEContextBuilder
 from ticket_analyzer import TicketAnalyzer
 # Import du système RAG
 from rag_system import TERAGSystem
-import cv2
-import numpy as np
-from PIL import ImageEnhance, ImageFilter
 
 # Initialiser le système RAG
 rag_system = TERAGSystem()
