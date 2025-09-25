@@ -247,7 +247,7 @@ def save_analysis_history(username: str, ticket_filename: str, question: str,
             "question": question,
             "result": analysis_result.get("result", "UNKNOWN"),
             "expense_type": analysis_result.get("expense_type", "Unknown"),
-            "justification": analysis_result.get("justification", "")[:500],  # Limiter la taille
+            "justification": analysis_result.get("justification", "")[:1000],  # Limiter la taille
             "amount": ticket_info.get("amount", ""),
             "currency": ticket_info.get("currency", ""), 
             "vendor": ticket_info.get("vendor", ""),

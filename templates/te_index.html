@@ -134,11 +134,12 @@
         }
 
         .analysis-header {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: linear-gradient(135deg, var(--primary), var(--accent));
             color: white;
             padding: 1.5rem 2rem;
-            text-align: center;
+            border-radius: 0 0 15px 15px;
             flex-shrink: 0;
+            box-shadow: 0 4px 20px rgba(118, 39, 155, 0.15);
         }
 
         .analysis-content-area {
@@ -369,6 +370,56 @@
         .chat-header {
             background: linear-gradient(135deg, var(--primary), var(--accent));
             border-radius: 0 0 15px 15px;
+        }
+
+        .chat-header-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem 2rem;
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .chat-header-text {
+            flex: 1;
+        }
+
+        .chat-title {
+            margin: 0;
+            font-weight: 600;
+            color: white;
+        }
+
+        .chat-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .status-indicator-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .chat-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+            margin: 0;
         }
 
         .chat-message.user {
@@ -740,6 +791,141 @@
             padding: 1rem;
         }
 
+        .upload-zone-modern {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .upload-zone-modern:hover {
+            border-color: var(--primary);
+            box-shadow: 0 8px 30px rgba(118, 39, 155, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .upload-visual {
+            padding: 3rem 2rem 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .upload-icon-container {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 8px 25px rgba(118, 39, 155, 0.3);
+        }
+
+        .upload-icon-main {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .upload-title {
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .upload-subtitle {
+            color: var(--muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .format-tag {
+            background: var(--secondary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin: 0 0.25rem;
+        }
+
+        .question-panel {
+            background: rgba(248, 250, 252, 0.5);
+            padding: 2rem;
+        }
+
+        .question-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .question-field {
+            width: 100%;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            resize: none;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .question-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(118, 39, 155, 0.1);
+            outline: none;
+        }
+
+        .action-buttons-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-action-modern {
+            flex: 1;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 15px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-action-modern:hover:not(:disabled) {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(118, 39, 155, 0.2);
+        }
+
+        .btn-action-modern.primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .btn-action-modern.primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(118, 39, 155, 0.3);
+        }
+
+        .btn-action-modern:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
     </style>
 </head>
 <body>
@@ -816,44 +1002,45 @@
                 <div class="analysis-content-area">
                     <!-- Section Upload -->
                     <div class="upload-section">
-                        <div class="upload-card" id="ticket-upload-area">
-                            <div class="upload-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
+                        <div class="upload-zone-modern" id="ticket-upload-area">
+                            <div class="upload-visual">
+                                <div class="upload-icon-container">
+                                    <i class="fas fa-cloud-upload-alt upload-icon-main"></i>
+                                </div>
+                                <div class="upload-content">
+                                    <h3 class="upload-title">Upload Your Expense Ticket</h3>
+                                    <p class="upload-subtitle">Drag and drop or click to browse</p>
+                                    <div class="supported-formats">
+                                        <span class="format-tag">PDF</span>
+                                        <span class="format-tag">Images</span>
+                                        <span class="format-tag">Documents</span>
+                                    </div>
+                                </div>
                             </div>
-                            <h4 class="mb-2">Drop Your Ticket Here</h4>
-                            <p class="text-muted mb-3">
-                                Drag and drop your expense ticket or click to browse
-                            </p>
-                            <div class="supported-formats">
-                                <span class="file-type-badge">PDF</span>
-                                <span class="file-type-badge">Images</span>
-                                <span class="file-type-badge">Word</span>
-                                <span class="file-type-badge">Excel</span>
+                            
+                            <div class="question-panel">
+                                <div class="question-header">
+                                    <i class="fas fa-comment-dots me-2"></i>
+                                    <span>Specific Question</span>
+                                    <small class="text-muted">(Optional)</small>
+                                </div>
+                                <textarea id="question-input" class="question-field" rows="2" 
+                                    placeholder="e.g., Is this expense within policy limits?"></textarea>
                             </div>
-
-                            <div class="question-section">
-                                <label class="form-label fw-semibold mb-2">
-                                    <i class="fas fa-question-circle me-1"></i>
-                                    Specific Question (Optional)
-                                </label>
-                                <textarea id="question-input" class="question-input" rows="2" 
-                                    placeholder="e.g., Is this expense within policy limits? What's the approval threshold?"></textarea>
-                            </div>
-
+                            
                             <div id="ticket-status" class="ticket-status"></div>
                         </div>
-                        
-                        <!-- BOUTONS SORTIS DE LA ZONE UPLOAD -->
-                        <div class="d-flex gap-2 mt-3">
-                            <button class="btn btn-outline-info flex-fill" id="preview-btn" onclick="previewTicket()" disabled>
-                                <i class="fas fa-eye me-2"></i>
-                                Preview Extracted Data
+                        <!-- BOUTONS D'ACTION -->
+                        <div class="action-buttons-row">
+                            <button class="btn-action-modern" id="preview-btn" onclick="previewTicket()" disabled>
+                                <i class="fas fa-eye"></i>
+                                <span>Preview Data</span>
                             </button>
-                        </div>    
-                        <button class="btn-analyze flex-fill" id="analyze-btn" onclick="analyzeTicket()" disabled>
-                            <i class="fas fa-magic me-2"></i>
-                            Analyze Ticket
-                        </button>
+                            <button class="btn-action-modern primary" id="analyze-btn" onclick="analyzeTicket()" disabled>
+                                <i class="fas fa-magic"></i>
+                                <span>Analyze Ticket</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Section Résultats -->
@@ -866,11 +1053,18 @@
             <!-- Sidebar Chatbot -->
             <div class="chatbot-sidebar">
                 <div class="chat-header">
-                    <h5 class="mb-1">
-                        <i class="fas fa-robot me-2"></i>
-                        T&E Assistant
-                    </h5>
-                    <small class="opacity-75">Ask me about T&E policies</small>
+                    <div class="chat-header-content">
+                        <div class="chat-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="chat-header-text">
+                            <h5 class="chat-title">T&E Assistant</h5>
+                            <div class="chat-status">
+                                <div class="status-indicator-dot"></div>
+                                <span class="chat-subtitle">Ready to help with policies</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="chat-container" id="chat-container">
@@ -1495,18 +1689,23 @@
             const statusDiv = document.getElementById('ticket-status');
             
             // Mettre à jour l'icône
-            const uploadIcon = uploadCard.querySelector('.upload-icon i');
-            uploadIcon.className = 'fas fa-file-check';
-            uploadIcon.style.color = 'var(--success)';
-            
+            const uploadIcon = uploadCard.querySelector('.upload-icon-main');
+            if (uploadIcon) {
+                uploadIcon.className = 'fas fa-file-check';
+                uploadIcon.style.color = 'var(--success)';
+            }
+
             // Mettre à jour le titre
-            const title = uploadCard.querySelector('h4');
-            title.textContent = 'File Ready for Analysis';
-            
+            const title = uploadCard.querySelector('.upload-title');
+            if (title) {
+                title.textContent = 'File Ready for Analysis';
+            }
+
             // Mettre à jour la description
-            const description = uploadCard.querySelector('p');
-            description.innerHTML = `<strong>${file.name}</strong><br><small class="text-muted">${formatFileSize(file.size)}</small>`;
-            
+            const description = uploadCard.querySelector('.upload-subtitle');
+            if (description) {
+                description.innerHTML = `<strong>${file.name}</strong><br><small class="text-muted">${formatFileSize(file.size)}</small>`;
+            }
             // Afficher le statut
             showTicketStatus('success', `File "${file.name}" loaded successfully`);
         }
@@ -1515,17 +1714,23 @@
             const uploadCard = document.getElementById('ticket-upload-area');
             
             // Réinitialiser l'icône
-            const uploadIcon = uploadCard.querySelector('.upload-icon i');
-            uploadIcon.className = 'fas fa-cloud-upload-alt';
-            uploadIcon.style.color = 'var(--primary)';
-            
+            const uploadIcon = uploadCard.querySelector('.upload-icon-main');
+            if (uploadIcon) {
+                uploadIcon.className = 'fas fa-cloud-upload-alt';
+                uploadIcon.style.color = 'white';
+            }
+
             // Réinitialiser le titre
-            const title = uploadCard.querySelector('h3');
-            title.textContent = 'Drop Your Ticket Here';
-            
+            const title = uploadCard.querySelector('.upload-title');
+            if (title) {
+                title.textContent = 'Upload Your Expense Ticket';
+            }
+
             // Réinitialiser la description
-            const description = uploadCard.querySelector('p');
-            description.innerHTML = 'Drag and drop your expense ticket or click to browse';
+            const description = uploadCard.querySelector('.upload-subtitle');
+            if (description) {
+                description.innerHTML = 'Drag and drop or click to browse';
+            }
         }
 
         async function analyzeTicket() {
