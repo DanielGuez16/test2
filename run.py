@@ -42,9 +42,7 @@ from ticket_analyzer import TicketAnalyzer
 from rag_system import TERAGSystem
 import cv2
 import numpy as np
-from paddleocr import PaddleOCR
 from PIL import ImageEnhance, ImageFilter
-import piexif
 
 
 ocr_engine = PaddleOCR(lang='fr', use_angle_cls=True, show_log=False)

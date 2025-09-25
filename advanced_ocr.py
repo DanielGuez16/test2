@@ -1,12 +1,9 @@
-# advanced_ocr.py
+# advanced_ocr.py - Version 100% offline
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
-from paddleocr import PaddleOCR
+import pytesseract
 import re
-from rapidfuzz import fuzz, process
-from dateparser import parse as parse_date
-from price_parser import Price
 from typing import List, Dict, Tuple
 import logging
 import io
@@ -15,172 +12,159 @@ logger = logging.getLogger(__name__)
 
 class AdvancedOCRProcessor:
     def __init__(self):
-        self.ocr = PaddleOCR(lang='fr', use_angle_cls=True, show_log=False)
+        # Configuration Tesseract optimisée pour tickets
+        self.tesseract_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàáâäéèêëíìîïóòôöúùûü.,:-€$£¥₹/°% '
+        self.tesseract_config_numbers = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789.,-€$£¥ '
     
     def preprocess_image(self, image_bytes: bytes) -> np.ndarray:
-        """Pipeline de préprocessing complète sans piexif"""
-        # Conversion PIL -> OpenCV
+        """Pipeline de préprocessing complète offline"""
+        # Conversion PIL
         pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         
-        # Correction orientation avec Pillow natif
-        pil_img = self._auto_orient_pillow(pil_img)
+        # Auto-orientation basique (sans EXIF, juste détection)
+        pil_img = self._auto_orient_basic(pil_img)
         
-        # Conversion BGR pour OpenCV
+        # Conversion OpenCV
         img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         
-        # Crop des bordures
-        h, w = img.shape[:2]
-        crop_margin = min(h, w) // 50
-        if crop_margin > 5:
-            img = img[crop_margin:-crop_margin, crop_margin:-crop_margin]
-        
-        # Débruitage bilatéral
-        img = cv2.bilateralFilter(img, 7, 50, 50)
-        
-        # Amélioration contraste avec CLAHE
-        img = self._enhance_contrast(img)
-        
-        # Affûtage (unsharp mask)
-        img = self._sharpen_image(img)
-        
-        # Détection et correction d'inclinaison
-        img = self._correct_skew(img)
+        # Pipeline de nettoyage
+        img = self._enhance_image_quality(img)
         
         return img
     
-    def _auto_orient_pillow(self, pil_img: Image.Image) -> Image.Image:
-        """Correction orientation avec Pillow natif (sans piexif)"""
+    def _auto_orient_basic(self, pil_img: Image.Image) -> Image.Image:
+        """Orientation basique sans EXIF - détection par analyse d'image"""
         try:
-            # Utiliser Pillow's getexif() (disponible depuis Pillow 6.0)
-            exif = pil_img.getexif()
+            # Convertir pour analyse
+            gray = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2GRAY)
             
-            # Code d'orientation EXIF
-            orientation_key = 274  # Code standard pour orientation
+            # Essayer les 4 orientations et choisir celle avec le plus de texte horizontal
+            orientations = [0, 90, 180, 270]
+            scores = []
             
-            if orientation_key in exif:
-                orientation = exif[orientation_key]
+            for angle in orientations:
+                if angle > 0:
+                    rotated = pil_img.rotate(angle, expand=True)
+                    test_gray = cv2.cvtColor(np.array(rotated), cv2.COLOR_RGB2GRAY)
+                else:
+                    test_gray = gray
                 
-                if orientation == 3:
-                    pil_img = pil_img.rotate(180, expand=True)
-                elif orientation == 6:
-                    pil_img = pil_img.rotate(270, expand=True)
-                elif orientation == 8:
-                    pil_img = pil_img.rotate(90, expand=True)
-                
-                logger.info(f"Image orientée : orientation EXIF {orientation}")
+                # Score basé sur les lignes horizontales
+                score = self._score_text_orientation(test_gray)
+                scores.append((angle, score))
             
+            # Prendre la meilleure orientation
+            best_angle = max(scores, key=lambda x: x[1])[0]
+            if best_angle > 0:
+                pil_img = pil_img.rotate(best_angle, expand=True)
+                logger.info(f"Image auto-orientée de {best_angle}°")
+                
         except Exception as e:
-            logger.warning(f"Impossible de lire EXIF pour orientation: {e}")
+            logger.warning(f"Erreur auto-orientation: {e}")
         
         return pil_img
     
-    def _enhance_contrast(self, img: np.ndarray) -> np.ndarray:
-        """Amélioration contraste avec CLAHE sur canal L"""
-        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
-        
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        l_enhanced = clahe.apply(l)
-        
-        return cv2.cvtColor(cv2.merge([l_enhanced, a, b]), cv2.COLOR_LAB2BGR)
-    
-    def _sharpen_image(self, img: np.ndarray) -> np.ndarray:
-        """Affûtage avec unsharp mask"""
-        blur = cv2.GaussianBlur(img, (0, 0), 1.0)
-        return cv2.addWeighted(img, 1.5, blur, -0.5, 0)
-    
-    def _correct_skew(self, img: np.ndarray) -> np.ndarray:
-        """Correction automatique d'inclinaison"""
+    def _score_text_orientation(self, gray: np.ndarray) -> float:
+        """Score une image selon la probabilité d'orientation correcte du texte"""
         try:
-            # Conversion en niveaux de gris
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # Détecter les contours
+            edges = cv2.Canny(gray, 50, 150, apertureSize=3)
             
-            # Binarisation
-            _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            # Lignes de Hough pour détecter l'horizontalité
+            lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=50)
             
-            # Détection des lignes avec HoughLines
-            edges = cv2.Canny(binary, 50, 150, apertureSize=3)
-            lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=100)
+            if lines is None:
+                return 0.0
             
-            if lines is not None:
-                angles = []
-                for rho, theta in lines[:20]:  # Prendre les 20 premières lignes
-                    angle = np.degrees(theta) - 90
-                    if -45 < angle < 45:  # Filtrer les angles raisonnables
-                        angles.append(angle)
+            horizontal_score = 0
+            for rho, theta in lines[:20]:
+                # Angle par rapport à l'horizontale
+                angle = abs(np.degrees(theta) - 90)
+                if angle > 90:
+                    angle = 180 - angle
                 
-                if angles:
-                    # Angle médian pour éviter les outliers
-                    skew_angle = np.median(angles)
-                    
-                    # Corriger seulement si l'angle est significatif (> 0.5°)
-                    if abs(skew_angle) > 0.5:
-                        h, w = img.shape[:2]
-                        center = (w // 2, h // 2)
-                        
-                        # Matrice de rotation
-                        M = cv2.getRotationMatrix2D(center, skew_angle, 1.0)
-                        
-                        # Calculer les nouvelles dimensions
-                        cos = np.abs(M[0, 0])
-                        sin = np.abs(M[0, 1])
-                        new_w = int((h * sin) + (w * cos))
-                        new_h = int((h * cos) + (w * sin))
-                        
-                        # Ajuster la translation
-                        M[0, 2] += (new_w / 2) - center[0]
-                        M[1, 2] += (new_h / 2) - center[1]
-                        
-                        # Appliquer la rotation
-                        img = cv2.warpAffine(img, M, (new_w, new_h), 
-                                           flags=cv2.INTER_CUBIC,
-                                           borderMode=cv2.BORDER_REPLICATE)
-                        
-                        logger.info(f"Image redressée de {skew_angle:.2f}°")
+                # Score plus élevé pour les lignes proches de l'horizontal
+                if angle < 10:  # Quasi-horizontal
+                    horizontal_score += 1
+            
+            return horizontal_score
+            
+        except:
+            return 0.0
+    
+    def _enhance_image_quality(self, img: np.ndarray) -> np.ndarray:
+        """Amélioration qualité image pour OCR"""
+        try:
+            # Redimensionner si trop petit
+            h, w = img.shape[:2]
+            if min(h, w) < 800:
+                scale = 800 / min(h, w)
+                new_w, new_h = int(w * scale), int(h * scale)
+                img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+            
+            # Débruitage
+            img = cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21)
+            
+            # Amélioration contraste
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            l = clahe.apply(l)
+            img = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
+            
+            # Affûtage
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            img = cv2.filter2D(img, -1, kernel)
+            
+            return img
             
         except Exception as e:
-            logger.warning(f"Erreur correction inclinaison: {e}")
-        
-        return img
+            logger.warning(f"Erreur amélioration image: {e}")
+            return img
     
-    def extract_text_paddleocr(self, img: np.ndarray) -> List[Dict]:
-        """Extraction texte avec PaddleOCR"""
+    def extract_text_tesseract(self, img: np.ndarray) -> List[Dict]:
+        """Extraction avec Tesseract local"""
         try:
-            results = self.ocr.ocr(img, cls=True)
+            # Conversion en PIL pour Tesseract
+            pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            
+            # Extraction avec données de position
+            data = pytesseract.image_to_data(
+                pil_img, 
+                config=self.tesseract_config,
+                output_type=pytesseract.Output.DICT
+            )
             
             lines = []
-            for result_page in results:
-                if result_page is None:
-                    continue
-                    
-                for detection in result_page:
-                    box, (text, confidence) = detection
-                    
-                    # Calculer bounding box
-                    x_coords = [point[0] for point in box]
-                    y_coords = [point[1] for point in box]
-                    x1, y1 = int(min(x_coords)), int(min(y_coords))
-                    x2, y2 = int(max(x_coords)), int(max(y_coords))
+            n_boxes = len(data['level'])
+            
+            for i in range(n_boxes):
+                confidence = int(data['conf'][i])
+                text = data['text'][i].strip()
+                
+                # Filtrer les détections faibles
+                if confidence > 30 and len(text) > 0:
+                    x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
                     
                     lines.append({
                         "text": text,
-                        "confidence": float(confidence),
-                        "bbox": [x1, y1, x2, y2],
-                        "area": (x2 - x1) * (y2 - y1)
+                        "confidence": confidence / 100.0,  # Normaliser 0-1
+                        "bbox": [x, y, x + w, y + h],
+                        "area": w * h
                     })
             
-            # Tri top-to-bottom, left-to-right
+            # Tri spatial
             lines.sort(key=lambda l: (l["bbox"][1], l["bbox"][0]))
             
-            logger.info(f"PaddleOCR: {len(lines)} lignes détectées")
+            logger.info(f"Tesseract: {len(lines)} éléments détectés")
             return lines
             
         except Exception as e:
-            logger.error(f"Erreur PaddleOCR: {e}")
+            logger.error(f"Erreur Tesseract: {e}")
             return []
-
+    
     def extract_structured_info(self, ocr_lines: List[Dict]) -> Dict:
-        """Extraction d'informations structurées depuis les lignes OCR"""
+        """Extraction d'infos structurées (identique à avant)"""
         info = {
             "merchant": None,
             "date": None,
@@ -194,82 +178,136 @@ class AdvancedOCRProcessor:
         if not ocr_lines:
             return info
         
+        # Reconstruire le texte par lignes spatiales
+        text_lines = self._reconstruct_text_lines(ocr_lines)
+        
         # Calculer confiance moyenne
         confidences = [line["confidence"] for line in ocr_lines if line["confidence"] > 0.3]
         info["confidence"] = sum(confidences) / len(confidences) if confidences else 0.0
         
-        # Détection commerçant (lignes du haut avec lettres)
-        top_lines = [l for l in ocr_lines if l["bbox"][1] < 150]
-        for line in top_lines:
-            text = line["text"].strip()
-            if len(text) > 3 and sum(c.isalpha() for c in text) > len(text) * 0.5:
-                if not info["merchant"] or line["confidence"] > 0.8:
-                    info["merchant"] = text
+        # Détection commerçant (première ligne substantielle)
+        for line_text in text_lines[:5]:  # Top 5 lignes
+            clean_text = line_text.strip()
+            if len(clean_text) > 3 and sum(c.isalpha() for c in clean_text) > 2:
+                info["merchant"] = clean_text
                 break
         
         # Détection date
-        date_pattern = r'(\d{1,2}[/\-\.]\d{1,2}[/\-\.](?:\d{4}|\d{2}))'
-        for line in ocr_lines:
-            match = re.search(date_pattern, line["text"])
+        full_text = " ".join(text_lines)
+        date_patterns = [
+            r'(\d{1,2}[/\-\.]\d{1,2}[/\-\.](?:\d{4}|\d{2}))',
+            r'(\d{1,2}\s+(?:jan|fév|mar|avr|mai|jun|jul|aoû|sep|oct|nov|déc)\s+\d{2,4})',
+        ]
+        
+        for pattern in date_patterns:
+            match = re.search(pattern, full_text, re.IGNORECASE)
             if match:
                 try:
+                    from dateparser import parse as parse_date
                     parsed_date = parse_date(match.group(1), languages=['fr', 'en'])
                     if parsed_date:
                         info["date"] = parsed_date.date().isoformat()
                         break
-                except:
-                    continue
-        
-        # Détection montants et total
-        amounts = []
-        for line in ocr_lines:
-            try:
-                price = Price.fromstring(line["text"])
-                if price.amount and float(price.amount.replace(',', '.')) > 0:
-                    amount_value = float(price.amount.replace(',', '.'))
-                    amounts.append({
-                        "value": amount_value,
-                        "currency": price.currency or "EUR",
-                        "text": line["text"],
-                        "confidence": line["confidence"],
-                        "is_total": any(word in line["text"].lower() 
-                                      for word in ["total", "ttc", "à payer", "amount"])
-                    })
-            except:
-                continue
-        
-        # Choisir le total (priorité aux lignes marquées "total", sinon max)
-        if amounts:
-            total_candidates = [a for a in amounts if a["is_total"]]
-            if total_candidates:
-                best_total = max(total_candidates, key=lambda x: x["confidence"])
-            else:
-                best_total = max(amounts, key=lambda x: x["value"])
-            
-            info["total"] = best_total["value"]
-            info["currency"] = best_total["currency"]
-        
-        # Détection TVA
-        for line in ocr_lines:
-            vat_match = re.search(r'(?:tva|vat).*?(\d{1,2}[,.]?\d{0,2})\s*%', 
-                                line["text"].lower())
-            if vat_match:
-                try:
-                    info["vat_rate"] = float(vat_match.group(1).replace(',', '.'))
+                except ImportError:
+                    # Parsing manuel si dateparser indisponible
+                    date_str = match.group(1)
+                    if self._is_valid_date_format(date_str):
+                        info["date"] = date_str
                     break
                 except:
                     continue
         
+        # Détection montants
+        amounts = self._extract_amounts(text_lines)
+        if amounts:
+            # Choisir le plus gros montant comme total probable
+            info["total"] = max(amounts)
+        
+        # Détection TVA
+        tva_match = re.search(r'(?:tva|vat|tax).*?(\d{1,2}[,.]?\d{0,2})\s*%', 
+                             full_text, re.IGNORECASE)
+        if tva_match:
+            try:
+                info["vat_rate"] = float(tva_match.group(1).replace(',', '.'))
+            except:
+                pass
+        
         return info
+    
+    def _reconstruct_text_lines(self, ocr_lines: List[Dict]) -> List[str]:
+        """Reconstitue les lignes de texte à partir des éléments OCR"""
+        if not ocr_lines:
+            return []
+        
+        # Grouper par hauteur Y approximative (tolérance de quelques pixels)
+        line_groups = []
+        tolerance = 10
+        
+        for element in ocr_lines:
+            y_center = (element["bbox"][1] + element["bbox"][3]) // 2
+            
+            # Trouver un groupe existant proche
+            placed = False
+            for group in line_groups:
+                group_y = sum((e["bbox"][1] + e["bbox"][3]) // 2 for e in group) // len(group)
+                if abs(y_center - group_y) <= tolerance:
+                    group.append(element)
+                    placed = True
+                    break
+            
+            if not placed:
+                line_groups.append([element])
+        
+        # Trier chaque groupe par position X et reconstituer le texte
+        text_lines = []
+        for group in line_groups:
+            group.sort(key=lambda e: e["bbox"][0])
+            line_text = " ".join(e["text"] for e in group)
+            text_lines.append(line_text)
+        
+        return text_lines
+    
+    def _extract_amounts(self, text_lines: List[str]) -> List[float]:
+        """Extraction des montants depuis les lignes de texte"""
+        amounts = []
+        
+        # Patterns pour montants
+        amount_patterns = [
+            r'(\d+[,.]?\d{0,2})\s*€',
+            r'(\d+[,.]?\d{0,2})\s*EUR',
+            r'€\s*(\d+[,.]?\d{0,2})',
+            r'(\d+[,.]?\d{0,2})\s*$',
+        ]
+        
+        for line in text_lines:
+            for pattern in amount_patterns:
+                matches = re.findall(pattern, line)
+                for match in matches:
+                    try:
+                        amount = float(match.replace(',', '.'))
+                        if 0.1 <= amount <= 10000:  # Filtres réalistes
+                            amounts.append(amount)
+                    except:
+                        continue
+        
+        return amounts
+    
+    def _is_valid_date_format(self, date_str: str) -> bool:
+        """Validation basique d'un format de date"""
+        patterns = [
+            r'\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}',
+            r'\d{1,2}\s+\w+\s+\d{2,4}'
+        ]
+        return any(re.match(pattern, date_str) for pattern in patterns)
 
     def process_ticket_image(self, image_bytes: bytes, filename: str) -> Dict:
-        """Pipeline complète de traitement d'image de ticket"""
+        """Pipeline complète offline"""
         try:
             # Préprocessing
             img_processed = self.preprocess_image(image_bytes)
             
             # OCR
-            ocr_lines = self.extract_text_paddleocr(img_processed)
+            ocr_lines = self.extract_text_tesseract(img_processed)
             
             # Extraction structurée
             structured_info = self.extract_structured_info(ocr_lines)
@@ -280,15 +318,15 @@ class AdvancedOCRProcessor:
             return {
                 "filename": filename,
                 "raw_text": full_text,
-                "extraction_method": "paddleocr_advanced",
+                "extraction_method": "tesseract_advanced",
                 "ocr_lines": ocr_lines,
                 "lines_detected": len(ocr_lines),
                 "average_confidence": structured_info["confidence"],
-                **structured_info  # Merge structured info
+                **structured_info
             }
             
         except Exception as e:
-            logger.error(f"Erreur pipeline OCR: {e}")
+            logger.error(f"Erreur pipeline OCR offline: {e}")
             return {
                 "filename": filename,
                 "error": str(e),
