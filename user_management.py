@@ -119,7 +119,7 @@ def log_activity(username: str, action: str, details: str = ""):
     except Exception as e:
         logger.error(f"Erreur sauvegarde log: {e}")
 
-def get_logs(limit: int = 100) -> List[Dict]:
+def get_logs(limit: int = 1000) -> List[Dict]:
     """
     Récupère les logs d'activité depuis SharePoint
     
@@ -290,7 +290,7 @@ def save_analysis_history(username: str, ticket_filename: str, question: str,
     except Exception as e:
         logger.error(f"Erreur sauvegarde analysis: {e}")
 
-def get_analysis_history(limit: int = 100) -> List[Dict]:
+def get_analysis_history(limit: int = 1000) -> List[Dict]:
     """
     Récupère l'historique des analyses depuis SharePoint
     

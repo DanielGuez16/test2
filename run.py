@@ -652,7 +652,7 @@ async def refresh_te_documents(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=500, detail=f"Error refreshing documents: {str(e)}")
 
 @app.get("/api/logs")
-async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 100):
+async def get_activity_logs(session_token: Optional[str] = Cookie(None), limit: int = 1000):
     current_user = get_current_user_from_session(session_token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
