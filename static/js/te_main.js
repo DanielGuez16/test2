@@ -494,6 +494,12 @@ function displayPreviewError(errorMessage) {
                 <div>
                     <h6 class="alert-heading mb-1">Extraction Failed</h6>
                     <p class="mb-0">${errorMessage}</p>
+                    <small class="text-muted mt-2">
+                        <strong>Tips:</strong><br>
+                        • Ensure image is clear and high-resolution<br>
+                        • Text should be clearly visible<br>
+                        • Try uploading as JPG or PNG format
+                    </small>
                 </div>
             </div>
         </div>

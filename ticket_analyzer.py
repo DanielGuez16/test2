@@ -38,7 +38,7 @@ class TicketAnalyzer:
             prompt = f"""
             QUESTION: {user_question if user_question else "Analyze this T&E expense according to company policies."}
 
-            TICKET INFORMATION:
+            TICKET INFORMATION (The ticket can be in every language):
             - Amount: {ticket_info.get('amount', 'Not detected')} {ticket_info.get('currency', 'N/A')}
             - Category: {ticket_info.get('category', 'Unknown')}
             - Date: {ticket_info.get('date', 'Not detected')}
