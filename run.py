@@ -797,36 +797,6 @@ async def clear_all_logs_api(session_token: Optional[str] = Cookie(None)):
         raise HTTPException(status_code=500, detail=f"Error clearing logs: {str(e)}")
 
 
-@app.get("/api/test-ocr")
-async def test_ocr_dependencies():
-    """Test des dépendances OCR"""
-    results = {}
-    
-    try:
-        import pytesseract
-        results["pytesseract"] = "✅ Available"
-        try:
-            version = pytesseract.get_tesseract_version()
-            results["tesseract_version"] = f"✅ {version}"
-        except:
-            results["tesseract_version"] = "❌ Binary not found"
-    except ImportError:
-        results["pytesseract"] = "❌ Not installed"
-    
-    try:
-        import cv2
-        results["opencv"] = f"✅ {cv2.__version__}"
-    except ImportError:
-        results["opencv"] = "❌ Not installed"
-    
-    try:
-        from PIL import Image
-        results["pillow"] = "✅ Available"
-    except ImportError:
-        results["pillow"] = "❌ Not installed"
-    
-    return {"dependencies": results}
-    
 @app.on_event("startup")
 async def startup_event():
     """Événements au démarrage de l'application"""
@@ -874,75 +844,152 @@ def preprocess_image_for_ocr(image):
         logger.warning(f"Erreur preprocessing: {e}")
         return image
 
+
 def extract_ticket_information(file_content: bytes, filename: str) -> dict:
-    """Extraction avec gestion d'erreur améliorée"""
+    """Extrait SEULEMENT le texte brut du ticket - AUCUNE analyse"""
     try:
         file_ext = Path(filename).suffix.lower()
-        logger.info(f"Traitement fichier: {filename} ({file_ext})")
+        text = ""
         
         if file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp']:
-            # Vérifier que les dépendances OCR sont disponibles
+            # Images - utiliser OCR avec preprocessing
             try:
-                from advanced_ocr import AdvancedOCRProcessor
+                image = Image.open(io.BytesIO(file_content))
+                image = preprocess_image_for_ocr(image)
                 
-                processor = AdvancedOCRProcessor()
-                result = processor.process_ticket_image(file_content, filename)
+                import pytesseract
+                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-€$£¥₹/: '
+                text = pytesseract.image_to_string(image, config=custom_config)
                 
-                # Vérifier si l'extraction a réussi
-                if result.get("error"):
-                    logger.error(f"Erreur OCR: {result['error']}")
-                    return {
-                        "filename": filename,
-                        "error": f"OCR processing failed: {result['error']}",
-                        "raw_text": "",
-                        "file_type": file_ext
-                    }
+                logger.info(f"OCR extrait {len(text)} caractères de {filename}")
                 
-                raw_text = result.get("raw_text", "")
-                if not raw_text.strip():
-                    logger.warning(f"Aucun texte extrait de {filename}")
-                    return {
-                        "filename": filename,
-                        "error": "No text could be extracted from this image. The image may be too blurry, low quality, or contain no readable text.",
-                        "raw_text": "",
-                        "file_type": file_ext,
-                        "extraction_method": "ocr_failed"
-                    }
+            except Exception as e:
+                logger.warning(f"Erreur OCR image: {e}")
+                text = f"Image file {filename} - OCR extraction failed"
                 
-                logger.info(f"OCR réussi: {len(raw_text)} caractères extraits")
+        elif file_ext == '.pdf':
+            # PDF - extraire le texte
+            try:
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+                text_parts = []
+                for page in pdf_reader.pages:
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        text_parts.append(page_text)
                 
-                return {
-                    "filename": filename,
-                    "raw_text": raw_text,
-                    "file_type": file_ext,
-                    "extraction_method": result.get("extraction_method", "tesseract_advanced"),
-                    "ocr_confidence": result.get("average_confidence", 0.0),
-                    "ocr_lines": result.get("ocr_lines", []),
-                    "lines_detected": result.get("lines_detected", 0),
-                    # Données structurées extraites
-                    "amount": result.get("total"),
-                    "currency": result.get("currency", "EUR"),
-                    "vendor": result.get("merchant"),
-                    "date": result.get("date"),
-                    "category": "unknown"
-                }
+                text = "\n".join(text_parts)
                 
-            except ImportError as e:
-                logger.error(f"Dépendances OCR manquantes: {e}")
-                return {
-                    "filename": filename,
-                    "error": "OCR dependencies missing. Please install: pip install pytesseract opencv-python pillow",
-                    "raw_text": "",
-                    "file_type": file_ext
-                }
-    except Exception as e:
-        logger.error(f"Erreur OCR inattendue: {e}")
+                # Si pas de texte extrait, essayer OCR sur PDF
+                if not text.strip():
+                    try:
+                        import fitz  # PyMuPDF
+                        pdf_doc = fitz.open(stream=file_content, filetype="pdf")
+                        
+                        for page_num in range(len(pdf_doc)):
+                            page = pdf_doc[page_num]
+                            mat = fitz.Matrix(2, 2)
+                            pix = page.get_pixmap(matrix=mat)
+                            img_data = pix.tobytes("png")
+                            
+                            image = Image.open(io.BytesIO(img_data))
+                            image = preprocess_image_for_ocr(image)
+                            
+                            page_text = pytesseract.image_to_string(image)
+                            if page_text.strip():
+                                text_parts.append(page_text)
+                        
+                        text = "\n".join(text_parts)
+                        logger.info(f"PDF OCR extrait {len(text)} caractères")
+                        
+                    except ImportError:
+                        logger.warning("PyMuPDF non disponible pour OCR PDF")
+                    except Exception as e:
+                        logger.warning(f"Erreur OCR PDF: {e}")
+                
+            except Exception as e:
+                logger.warning(f"Erreur lecture PDF: {e}")
+                text = f"PDF file {filename} - text extraction failed"
+        
+        elif file_ext in ['.docx', '.doc']:
+            # Documents Word
+            try:
+                if file_ext == '.docx':
+                    doc = Document(io.BytesIO(file_content))
+                    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+                else:
+                    try:
+                        import docx2txt
+                        text = docx2txt.process(io.BytesIO(file_content))
+                    except ImportError:
+                        text = f"DOC file {filename} - docx2txt not available, please convert to DOCX"
+            except Exception as e:
+                logger.warning(f"Erreur lecture Word: {e}")
+                text = f"Word file {filename} - text extraction failed"
+                
+        elif file_ext in ['.xlsx', '.xls']:
+            # Fichiers Excel
+            try:
+                if file_ext == '.xlsx':
+                    df = pd.read_excel(io.BytesIO(file_content), sheet_name=None)
+                else:
+                    df = pd.read_excel(io.BytesIO(file_content), sheet_name=None, engine='xlrd')
+                
+                text_parts = []
+                for sheet_name, sheet_df in df.items():
+                    text_parts.append(f"Sheet: {sheet_name}")
+                    text_parts.append(sheet_df.to_string())
+                text = "\n".join(text_parts)
+            except Exception as e:
+                logger.warning(f"Erreur lecture Excel: {e}")
+                text = f"Excel file {filename} - text extraction failed"
+                
+        elif file_ext in ['.txt', '.csv']:
+            # Fichiers texte et CSV
+            try:
+                text = file_content.decode('utf-8', errors='ignore')
+            except Exception as e:
+                try:
+                    text = file_content.decode('latin-1', errors='ignore')
+                except:
+                    text = f"Text file {filename} - encoding detection failed"
+                    
+        elif file_ext in ['.rtf']:
+            # Rich Text Format
+            try:
+                from striprtf.striprtf import rtf_to_text
+                text = rtf_to_text(file_content.decode('utf-8', errors='ignore'))
+            except ImportError:
+                text = f"RTF file {filename} - striprtf not available"
+            except Exception as e:
+                logger.warning(f"Erreur lecture RTF: {e}")
+                text = f"RTF file {filename} - text extraction failed"
+                
+        else:
+            # Type non supporté - essayer comme texte brut
+            try:
+                text = file_content.decode('utf-8', errors='ignore')
+                if not text.strip():
+                    text = f"Unknown file type {filename} - content unreadable"
+            except:
+                text = f"Unsupported file type {filename} ({file_ext})"
+    
+        # RETOURNER SEULEMENT LE TEXTE - PAS D'ANALYSE
         return {
             "filename": filename,
-            "error": f"OCR processing error: {str(e)}",
-            "raw_text": "",
-            "file_type": file_ext
+            "raw_text": text[:2000],  # Plus de texte pour l'IA
+            "file_type": file_ext,
+            "extraction_method": "text_only"
         }
+        
+    except Exception as e:
+        logger.error(f"Erreur extraction texte: {e}")
+        return {
+            "filename": filename,
+            "error": str(e),
+            "raw_text": "",
+            "file_type": Path(filename).suffix.lower()
+        }
+
 
 if __name__ == "__main__":
     print("🚀 T&E Chatbot - APAC Region")

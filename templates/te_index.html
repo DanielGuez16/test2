@@ -1586,93 +1586,73 @@
         }
 
         .enhanced-list {
-            list-style: none;
-            padding: 0;
-        }
+    list-style: none;
+    padding: 0;
+}
 
-        .enhanced-list-item {
-            background: white;
-            margin-bottom: 0.5rem;
-            border-radius: 6px;
-            border-left: 3px solid var(--primary);
-            transition: all 0.2s ease;
-        }
+.enhanced-list-item {
+    background: white;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+    transition: all 0.2s ease;
+}
 
-        .enhanced-list-item:hover {
-            background: rgba(118, 39, 155, 0.02);
-            transform: translateX(3px);
-        }
+.enhanced-list-item:hover {
+    background: rgba(118, 39, 155, 0.02);
+    transform: translateX(3px);
+}
 
-        .list-item-content {
-            padding: 0.75rem 1rem;
-        }
+.list-item-content {
+    padding: 0.75rem 1rem;
+}
 
-        .enhanced-definition {
-            background: linear-gradient(135deg, #f8f9ff, #ffffff);
-            border: 1px solid rgba(118, 39, 155, 0.2);
-            border-radius: 8px;
-            overflow: hidden;
-        }
+.enhanced-definition {
+    background: linear-gradient(135deg, #f8f9ff, #ffffff);
+    border: 1px solid rgba(118, 39, 155, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
 
-        .definition-term {
-            background: var(--primary);
-            color: white;
-            padding: 0.75rem 1rem;
-            font-weight: 600;
-        }
+.definition-term {
+    background: var(--primary);
+    color: white;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+}
 
-        .definition-content {
-            padding: 1rem;
-        }
+.definition-content {
+    padding: 1rem;
+}
 
-        .enhanced-alert {
-            display: flex;
-            align-items: flex-start;
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 1rem;
-        }
+.enhanced-alert {
+    display: flex;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 1rem;
+}
 
-        .alert-icon {
-            color: #856404;
-            font-size: 1.2rem;
-            margin-right: 1rem;
-            margin-top: 0.1rem;
-        }
+.alert-icon {
+    color: #856404;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+    margin-top: 0.1rem;
+}
 
-        .alert-content {
-            flex: 1;
-            color: #856404;
-            font-weight: 500;
-        }
+.alert-content {
+    flex: 1;
+    color: #856404;
+    font-weight: 500;
+}
 
-        .enhanced-paragraph {
-            margin-bottom: 1.2rem;
-            line-height: 1.7;
-            text-align: justify;
-            hyphens: auto;
-        }
-
-        /* Styles pour l'indicateur OCR */
-        .ocr-quality-indicator {
-            border: 1px solid var(--border);
-            transition: all 0.3s ease;
-        }
-
-        .ocr-quality-indicator:hover {
-            box-shadow: 0 2px 8px rgba(118, 39, 155, 0.1);
-        }
-
-        .progress {
-            border-radius: 10px;
-            background: rgba(0, 0, 0, 0.1);
-        }
-
-        .progress-bar {
-            border-radius: 10px;
-            transition: width 0.5s ease;
-        }
+.enhanced-paragraph {
+    margin-bottom: 1.2rem;
+    line-height: 1.7;
+    text-align: justify;
+    hyphens: auto;
+}
     </style>
 </head>
 <body>
@@ -1739,10 +1719,10 @@
             <!-- Zone d'analyse de tickets -->
             <div class="ticket-analysis-zone">
                 <div class="analysis-header">
-                    <div class="chat-avatar"></div>
-                        <i class="fas fa-file-invoice-dollar"></i>
-                    </div>
-                    <h5 class="chat-title text-white mb-0">Ticket Analysis Engine</h5>
+                    <h5 class="chat-title text-white mb-0">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                        Ticket Analysis Engine
+                    </h5>
                     <span class="chat-subtitle">Upload and analyze your expense tickets for policy compliance</span>
                 </div>
 
@@ -2016,7 +1996,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="fas fa-receipt me-2"></i>Extracted Ticket Information
+                        <i class="fas fa-receipt me-2"></i>Extracted Ticket Information (Fake Ticket)
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -2314,7 +2294,6 @@
             }
         }
 
-        
         // Afficher l'aperçu stylisé du ticket façon "ticket de caisse" réaliste
         function displayTicketPreview(ticketInfo, confidence) {
             const content = document.getElementById('ticket-preview-content');
@@ -2382,37 +2361,8 @@
             const barcodeData = (txId + ' ' + totalTTC).toUpperCase();
             const fakeBars = '▌▌ ▌▌▌  ▌ ▌▌ ▌▌▌ ▌  ▌▌ ▌▌  ▌▌▌ ▌ ▌  ▌'.slice(0, 38);
 
-            // -------- UNE SEULE assignation content.innerHTML --------
+            // -------- Gabarit HTML (utilise tes classes .receipt-*) --------
             content.innerHTML = `
-                <!-- Indicateur qualité OCR -->
-                <div class="ocr-quality-indicator mb-4 p-3 bg-light rounded">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fas fa-eye me-2 text-primary"></i>
-                            <strong>OCR Quality:</strong>
-                            <span class="ms-2">${confidenceText}</span>
-                        </div>
-                        <div class="progress" style="width: 120px; height: 8px;">
-                            <div class="progress-bar bg-${confidenceColor}" 
-                                style="width: ${Math.round(confidence*100)}%"
-                                aria-valuenow="${Math.round(confidence*100)}" 
-                                aria-valuemin="0" 
-                                aria-valuemax="100">
-                            </div>
-                        </div>
-                        <small class="text-muted ms-2">${Math.round(confidence*100)}%</small>
-                    </div>
-                    ${confidence < 0.6 ? `
-                        <div class="mt-2">
-                            <small class="text-warning">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                Low confidence detected. Please verify extracted data.
-                            </small>
-                        </div>
-                    ` : ''}
-                </div>
-
-                <!-- Reçu stylisé -->
                 <div class="receipt-container" style="max-width: 360px;">
                     <div class="receipt-paper" style="font-family: 'Courier New', monospace; font-size: 13px;">
                         
@@ -2437,7 +2387,7 @@
                         <div class="receipt-details">
 
                             <div class="receipt-row" style="border-bottom:none;">
-                                <span class="item-label">DATE</span>
+                                <span class="item-label">UPLOAD TICKET DATE</span>
                                 <span class="item-value">${fmtDate(ticketDate)}</span>
                             </div>
                             <div class="receipt-row" style="border-bottom:none;">
@@ -2518,7 +2468,6 @@
                 </div>
             `;
         }
-
 
         // Afficher les erreurs de preview
         function displayPreviewError(errorMessage) {
